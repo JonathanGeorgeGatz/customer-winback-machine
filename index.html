@@ -1,0 +1,2629 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Customer Win-Back Machine</title>
+<style>
+  :root{
+    --ink:#22272B; --paper:#F7F5F0; --card:#FFFFFF; --line:#E3DFD6;
+    --spruce:#1F5E46; --copper:#B0622D; --red:#9E2B25; --amber:#8A6D1C;
+    --mut:#6B7075; --good:#2F6B4F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+       font:15px/1.45 "Avenir Next","Segoe UI",system-ui,sans-serif}
+  header{background:var(--spruce);color:#F3EFE6;padding:18px 26px;
+         display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+  header h1{font-size:21px;margin:0;font-weight:700;letter-spacing:.2px}
+  header .sub{opacity:.85;font-size:13px}
+  #asof{margin-left:auto;font-size:13px;background:rgba(255,255,255,.12);
+        padding:4px 10px;border-radius:4px}
+  #badge{display:none;font-size:12px;background:var(--copper);color:#fff;
+         padding:3px 9px;border-radius:4px;letter-spacing:.4px}
+  main{max-width:1180px;margin:0 auto;padding:20px 26px 60px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:8px;
+         padding:16px 18px;margin:0 0 16px}
+  .panel h2{margin:0 0 10px;font-size:15px;letter-spacing:.3px;color:var(--spruce)}
+  textarea{width:100%;height:150px;border:1px solid var(--line);border-radius:6px;
+           padding:10px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;
+           white-space:pre;resize:vertical;background:#FCFBF8;color:var(--ink)}
+  .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  button{background:var(--spruce);color:#fff;border:0;border-radius:6px;
+         padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer}
+  button.ghost{background:#fff;color:var(--spruce);border:1px solid var(--spruce)}
+  button:active{transform:translateY(1px)}
+  label.set{font-size:12.5px;color:var(--mut);display:flex;flex-direction:column;gap:3px}
+  label.set input{width:92px;border:1px solid var(--line);border-radius:5px;
+                  padding:6px 8px;font-size:14px;background:#fff;color:var(--ink)}
+  label.set input:focus{outline:2px solid var(--copper)}
+  #cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+         gap:12px;margin:0 0 16px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+  .kpi .n{font-size:26px;font-weight:700;max-width:100%;overflow-wrap:anywhere}
+  .kpi .l{font-size:12px;color:var(--mut);margin-top:2px}
+  .kpi.red .n{color:var(--red)} .kpi.amb .n{color:var(--amber)}
+  .kpi.grn .n{color:var(--good)} .kpi.cop .n{color:var(--copper)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{font-size:11.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);
+     text-align:left;padding:6px 8px;border-bottom:2px solid var(--line)}
+  td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:#F2EFE7}
+  tr.sel{background:#EDE6D8}
+  .seg-note{font-size:12.5px;color:var(--mut);margin:-4px 0 10px}
+  #msgpanel{display:none}
+  .msg{border:1px solid var(--line);border-radius:6px;background:#FCFBF8;
+       padding:12px;margin:0 0 10px}
+  .msg h3{margin:0 0 6px;font-size:13px;color:var(--copper)}
+  .msg pre{margin:0 0 8px;white-space:pre-wrap;font:13px/1.5 inherit}
+  .copied{color:var(--good);font-size:12px;margin-left:8px}
+  #unusable li{font:12.5px/1.6 ui-monospace,Menlo,monospace}
+  #bizname{border:1px solid var(--line);border-radius:5px;padding:7px 9px;font-size:14px;
+           background:#fff;color:var(--ink);width:240px}
+  footer{max-width:1180px;margin:0 auto;padding:0 26px 40px;font-size:12px;color:var(--mut)}
+  .empty-note{color:var(--mut);font-size:13px;padding:8px 0}
+  details summary{cursor:pointer;font-size:13.5px;color:var(--spruce);font-weight:600}
+</style>
+</head>
+<body>
+<header>
+  <h1>Customer Win-Back Machine</h1>
+  <span class="sub">who stopped coming back, what they were worth, what to send them</span>
+  <span id="badge">SAMPLE DATA — FICTIONAL</span>
+  <span id="asof">no data yet</span>
+</header>
+<main>
+  <section class="panel" id="inpanel">
+    <h2>1 · Paste your sales export</h2>
+    <textarea id="csv" spellcheck="false"
+      placeholder="Date,Customer,Email,Service,Amount&#10;2026-01-15,Jane Doe,jane@example.com,Full groom,85.00"></textarea>
+    <div class="row">
+      <button id="analyze">Analyze</button>
+      <button id="loadsample" class="ghost">Load the sample export (fictional)</button>
+      <label class="set">lapsed past (× usual gap)
+        <input id="s_lapse" type="number" step="0.1" min="1" value="2.5"></label>
+      <label class="set">slipping past (× usual gap)
+        <input id="s_slip" type="number" step="0.05" min="1" value="1.5"></label>
+      <label class="set">visits before cadence counts
+        <input id="s_minv" type="number" step="1" min="2" value="3"></label>
+      <label class="set">one-timer quiet days
+        <input id="s_onetime" type="number" step="1" min="1" value="90"></label>
+      <label class="set">assumed win-back rate %
+        <input id="s_rate" type="number" step="1" min="0" max="100" value="10"></label>
+    </div>
+  </section>
+
+  <div id="cards"></div>
+
+  <section class="panel" id="lapsedpanel" style="display:none">
+    <h2>2 · Gone quiet — regulars past their own rhythm</h2>
+    <p class="seg-note">Each customer is judged against their own visiting gap, never a fixed
+      window. Ranked by what a year of them is worth. Click a name to write the message.</p>
+    <table id="t_lapsed"><thead><tr>
+      <th>Customer</th><th>Usual gap</th><th>Last visit</th><th class="r">Quiet</th>
+      <th class="r">Visits</th><th class="r">A year of them</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="panel" id="slippanel" style="display:none">
+    <h2>3 · Slipping — overdue, not gone. Reach these first.</h2>
+    <table id="t_slip"><thead><tr>
+      <th>Customer</th><th>Usual gap</th><th>Last visit</th><th class="r">Quiet</th>
+      <th class="r">Visits</th><th class="r">A year of them</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="panel" id="onetimepanel" style="display:none">
+    <h2>4 · Never came back — one visit, then nothing</h2>
+    <p class="seg-note">First-timers are not “lapsed”; they never started. They get a
+      different message. Spend shown is what they spent, once — it is not multiplied
+      into a yearly anything.</p>
+    <table id="t_onetime"><thead><tr>
+      <th>Customer</th><th>Visited</th><th class="r">Quiet</th><th class="r">Spent (once)</th>
+    </tr></thead><tbody></tbody></table>
+  </section>
+
+  <section class="panel" id="msgpanel">
+    <h2>5 · The message — three ways to say it</h2>
+    <div class="row" style="margin:0 0 10px">
+      <label class="set">sign it as
+        <input id="bizname" type="text" placeholder="Your business name"></label>
+      <span id="msgwho" class="seg-note"></span>
+    </div>
+    <div id="msgs"></div>
+  </section>
+
+  <section class="panel" id="lowpanel" style="display:none">
+    <details><summary id="lowsum">Too new to call</summary>
+    <p class="seg-note">Not enough visits to know a rhythm, or a first-timer it is too
+      early to chase. The honest answer is “wait”, so that is the answer.</p>
+    <table id="t_low"><thead><tr>
+      <th>Customer</th><th class="r">Visits</th><th class="r">Quiet</th>
+      <th class="r">Spent</th></tr></thead><tbody></tbody></table></details>
+  </section>
+
+  <section class="panel" id="unupanel" style="display:none">
+    <details><summary id="unusum">Rows this report is not built on</summary>
+    <ul id="unusable"></ul></details>
+  </section>
+</main>
+<footer>
+  Everything stays in this page — no network, no account, nothing leaves your machine.
+  The projection is an estimate, not a promise. Sample data is fictional; every
+  address in it is @example.com. Built on camera for “Build It With AI”.
+</footer>
+
+<script id="sampledata" type="text/csv">Date,Customer,Email,Service,Amount
+2024-10-01,Fern Xiong,fern.xiong@example.com,Full groom,62.00
+2024-10-02,Lela Fairweather,lela.fairweather@example.com,Teeth & nails,102.00
+2024-10-03,Caleb Rasmussen,caleb.rasmussen@example.com,De-shed treatment,57.00
+2024-10-04,Elif Zeller,elif.zeller@example.com,Full groom,79.00
+2024-10-07,Cora Whitlock,cora.whitlock@example.com,Teeth & nails,92.00
+2024-10-07,Gus Sandoval,gus.sandoval@example.com,Teeth & nails,88.00
+2024-10-07,Moss Sandoval,moss.sandoval@example.com,Nail trim,80.00
+2024-10-07,Tansy Birkeland,tansy.birkeland@example.com,Puppy intro groom,91.00
+2024-10-14,Mika Sorensen,mika.sorensen@example.com,Bath & brush,66.00
+2024-10-15,Nia Xiong,nia.xiong@example.com,De-shed treatment,70.00
+2024-10-16,Nia Vanterpool,nia.vanterpool@example.com,Full groom + de-shed,65.00
+2024-10-22,Quentin Umali,quentin.umali@example.com,Nail trim,76.00
+2024-10-23,Cora Vanterpool,cora.vanterpool@example.com,Teeth & nails,77.00
+2024-10-25,Elif Zeller,elif.zeller@example.com,Full groom,79.00
+2024-10-26,Caleb Rasmussen,caleb.rasmussen@example.com,Nail trim,47.00
+2024-10-26,Evelyn Hartree,evelyn.hartree@example.com,Full groom + de-shed,160.00
+2024-10-28,Hana Drummond,hana.drummond@example.com,Puppy intro groom,105.00
+2024-10-29,Arlo Delgado,arlo.delgado@example.com,Teeth & nails,106.00
+2024-10-30,Nell Birkeland,nell.birkeland@example.com,Puppy intro groom,47.00
+2024-11-01,Tansy Birkeland,tansy.birkeland@example.com,Nail trim,95.00
+2024-11-01,Umberto Drummond,umberto.drummond@example.com,Teeth & nails,69.00
+2024-11-02,Bess Jernigan,bess.jernigan@example.com,De-shed treatment,61.00
+2024-11-02,Fern Xiong,fern.xiong@example.com,Puppy intro groom,57.00
+2024-11-05,Caleb Fairweather,caleb.fairweather@example.com,Teeth & nails,75.00
+2024-11-05,Marisol Quintana,marisol.q@example.com,Bath & brush,87.00
+2024-11-05,Moss Sandoval,moss.sandoval@example.com,Full groom,79.00
+2024-11-06,Lela Fairweather,lela.fairweather@example.com,Bath & brush,101.00
+2024-11-07,Nia Vanterpool,nia.vanterpool@example.com,Teeth & nails,72.00
+2024-11-08,Gus Sandoval,gus.sandoval@example.com,Teeth & nails,80.00
+2024-11-08,Umberto Quill,umberto.quill@example.com,Full groom + de-shed,50.00
+2024-11-13,Elif Zeller,elif.zeller@example.com,Teeth & nails,83.00
+2024-11-13,Mika Sorensen,mika.sorensen@example.com,Bath & brush,68.00
+2024-11-14,Nia Xiong,nia.xiong@example.com,Full groom + de-shed,67.00
+2024-11-14,Ximena Xiong,ximena.xiong@example.com,Bath & brush,67.00
+2024-11-16,Gideon Bostwick,gideon.bostwick@example.com,Teeth & nails,74.00
+2024-11-18,Nell Umali,nell.umali@example.com,Nail trim,102.00
+2024-11-19,Cora Whitlock,cora.whitlock@example.com,Bath & brush,89.00
+2024-11-20,Caleb Rasmussen,caleb.rasmussen@example.com,Full groom + de-shed,62.00
+2024-11-20,Matteo Obradovic,matteo.obradovic@example.com,Full groom + de-shed,100.00
+2024-11-20,Nell Birkeland,nell.birkeland@example.com,Full groom + de-shed,62.00
+2024-11-20,Nell Eastman,nell.eastman@example.com,De-shed treatment,79.00
+2024-11-21,Bess Jernigan,bess.jernigan@example.com,De-shed treatment,68.00
+2024-11-24,Quentin Umali,quentin.umali@example.com,Full groom,72.00
+2024-11-26,Hana Drummond,hana.drummond@example.com,Full groom,104.00
+2024-11-26,Nia Vanterpool,nia.vanterpool@example.com,Full groom + de-shed,57.00
+2024-11-27,Arlo Quill,arlo.quill@example.com,Bath & brush,80.00
+2024-11-27,Caleb Fairweather,caleb.fairweather@example.com,Nail trim,66.00
+2024-11-27,Wendell Calloway,wendell.calloway@example.com,Nail trim,67.00
+2024-11-28,Tansy Birkeland,tansy.birkeland@example.com,Full groom + de-shed,88.00
+2024-11-28,Ximena Delgado,ximena.delgado@example.com,Puppy intro groom,117.00
+2024-11-29,Gus Whitlock,gus.whitlock@example.com,Teeth & nails,64.00
+2024-11-30,Cora Vanterpool,cora.vanterpool@example.com,Full groom,87.00
+2024-12-01,Moss Sandoval,moss.sandoval@example.com,Nail trim,80.00
+2024-12-01,Tansy Xiong,tansy.xiong@example.com,Nail trim,59.00
+2024-12-01,Wendell Umali,wendell.umali@example.com,Teeth & nails,79.00
+2024-12-03,Marisol Quintana,marisol.q@example.com,Full groom,93.00
+2024-12-03,Umberto Ainsley,umberto.ainsley@example.com,Full groom + de-shed,53.00
+2024-12-03,Ximena Xiong,ximena.xiong@example.com,Full groom + de-shed,71.00
+2024-12-04,Cora Pemberton,cora.pemberton@example.com,Bath & brush,78.00
+2024-12-05,Elif Zeller,elif.zeller@example.com,De-shed treatment,83.00
+2024-12-05,Umberto Quill,umberto.quill@example.com,Full groom,63.00
+2024-12-07,Nell Umali,nell.umali@example.com,Nail trim,90.00
+2024-12-08,Gus Sandoval,gus.sandoval@example.com,Full groom,73.00
+2024-12-08,Kenji Cuthbert,kenji.cuthbert@example.com,Puppy intro groom,60.00
+2024-12-10,Bess Jernigan,bess.jernigan@example.com,Full groom,61.00
+2024-12-10,Fern Xiong,fern.xiong@example.com,De-shed treatment,52.00
+2024-12-10,Gideon Bostwick,gideon.bostwick@example.com,Puppy intro groom,75.00
+2024-12-10,Lela Fairweather,lela.fairweather@example.com,De-shed treatment,97.00
+2024-12-13,Arlo Delgado,arlo.delgado@example.com,Full groom,112.00
+2024-12-13,Gus Umali,gus.umali@example.com,Teeth & nails,109.00
+2024-12-13,Mika Sorensen,mika.sorensen@example.com,Bath & brush,68.00
+2024-12-13,Nell Birkeland,nell.birkeland@example.com,Teeth & nails,48.00
+2024-12-13,Nia Xiong,nia.xiong@example.com,De-shed treatment,64.00
+2024-12-15,Caleb Rasmussen,caleb.rasmussen@example.com,Full groom,59.00
+2024-12-15,Umberto Drummond,umberto.drummond@example.com,Puppy intro groom,60.00
+2024-12-16,Hana Thackeray,hana.thackeray@example.com,Full groom,48.00
+2024-12-17,Aiyana Fairweather,aiyana.fairweather@example.com,Teeth & nails,92.00
+2024-12-17,Caleb Fairweather,caleb.fairweather@example.com,Bath & brush,68.00
+2024-12-17,Nia Vanterpool,nia.vanterpool@example.com,Puppy intro groom,66.00
+2024-12-22,Hana Ainsley,hana.ainsley@example.com,Full groom,93.00
+2024-12-22,Nell Eastman,nell.eastman@example.com,De-shed treatment,90.00
+2024-12-22,Tansy Northcutt,tansy.northcutt@example.com,Teeth & nails,65.00
+2024-12-23,Gideon Northcutt,gideon.northcutt@example.com,Full groom + de-shed,67.00
+2024-12-23,Wendell Umali,wendell.umali@example.com,Full groom,91.00
+2024-12-23,Ximena Xiong,ximena.xiong@example.com,Nail trim,61.00
+2024-12-24,Hana Drummond,hana.drummond@example.com,De-shed treatment,106.00
+2024-12-24,Hollis Obradovic,hollis.obradovic@example.com,Full groom,49.00
+2024-12-24,Silas Xiong,silas.xiong@example.com,Nail trim,94.00
+2024-12-24,Tansy Birkeland,tansy.birkeland@example.com,Full groom,99.00
+2024-12-25,Arlo Quill,arlo.quill@example.com,Nail trim,93.00
+2024-12-25,Matteo Ibarra,matteo.ibarra@example.com,Full groom + de-shed,58.00
+2024-12-26,Nell Umali,nell.umali@example.com,Puppy intro groom,89.00
+2024-12-26,Quentin Umali,quentin.umali@example.com,Teeth & nails,78.00
+2024-12-26,Ximena Delgado,ximena.delgado@example.com,Puppy intro groom,109.00
+2024-12-27,Moss Sandoval,moss.sandoval@example.com,Full groom + de-shed,93.00
+2024-12-27,Rosa Northcutt,rosa.northcutt@example.com,Bath & brush,86.00
+2024-12-28,Elif Zeller,elif.zeller@example.com,De-shed treatment,87.00
+2024-12-29,Bess Jernigan,bess.jernigan@example.com,Nail trim,69.00
+2024-12-29,Nia Ainsley,nia.ainsley@example.com,Nail trim,71.00
+2024-12-30,Marisol Quintana,marisol.q@example.com,Bath & brush,89.00
+2024-12-30,Pilar Northcutt,pilar.northcutt@example.com,Nail trim,87.00
+2024-12-30,Wendell Calloway,wendell.calloway@example.com,Puppy intro groom,71.00
+2024-12-31,Pilar Cuthbert,pilar.cuthbert@example.com,Nail trim,63.00
+2025-01-01,Cora Vanterpool,cora.vanterpool@example.com,Teeth & nails,72.00
+2025-01-01,Imogen Bostwick,imogen.bostwick@example.com,Puppy intro groom,74.00
+2025-01-01,Umberto Quill,umberto.quill@example.com,Teeth & nails,57.00
+2025-01-02,Gideon Bostwick,gideon.bostwick@example.com,Puppy intro groom,79.00
+2025-01-03,Cora Whitlock,cora.whitlock@example.com,De-shed treatment,84.00
+2025-01-04,Nell Birkeland,nell.birkeland@example.com,De-shed treatment,57.00
+2025-01-04,Quentin Goodall,quentin.goodall@example.com,Full groom + de-shed,78.00
+2025-01-05,Gus Sandoval,gus.sandoval@example.com,De-shed treatment,78.00
+2025-01-06,Caleb Drummond,caleb.drummond@example.com,Puppy intro groom,93.00
+2025-01-06,Nia Vanterpool,nia.vanterpool@example.com,Bath & brush,64.00
+2025-01-06,Rosa Pemberton,rosa.pemberton@example.com,Teeth & nails,81.00
+2025-01-08,Caleb Fairweather,caleb.fairweather@example.com,Teeth & nails,72.00
+2025-01-08,Caleb Rasmussen,caleb.rasmussen@example.com,Bath & brush,55.00
+2025-01-08,Gus Umali,gus.umali@example.com,Full groom,114.00
+2025-01-08,Theo Branagh,theo.branagh@example.com,Full groom,101.00
+2025-01-09,Nia Xiong,nia.xiong@example.com,De-shed treatment,60.00
+2025-01-11,Cora Pemberton,cora.pemberton@example.com,Nail trim,85.00
+2025-01-11,Wendell Umali,wendell.umali@example.com,Full groom,90.00
+2025-01-12,Lela Zeller,lela.zeller@example.com,Nail trim,77.00
+2025-01-13,Gus Whitlock,gus.whitlock@example.com,Puppy intro groom,71.00
+2025-01-13,Lela Fairweather,lela.fairweather@example.com,Full groom,91.00
+2025-01-14,Matteo Obradovic,matteo.obradovic@example.com,De-shed treatment,89.00
+2025-01-14,Pilar Mercado,pilar.mercado@example.com,De-shed treatment,75.00
+2025-01-15,Fern Xiong,fern.xiong@example.com,Nail trim,57.00
+2025-01-15,Ximena Goodall,ximena.goodall@example.com,De-shed treatment,75.00
+2025-01-15,Ximena Xiong,ximena.xiong@example.com,Full groom + de-shed,72.00
+2025-01-16,Elif Zeller,elif.zeller@example.com,Teeth & nails,88.00
+2025-01-16,Nell Umali,nell.umali@example.com,Puppy intro groom,90.00
+2025-01-16,Tansy Obradovic,tansy.obradovic@example.com,De-shed treatment,105.00
+2025-01-16,Wendell Yarborough,wendell.yarborough@example.com,Full groom + de-shed,67.00
+2025-01-17,Tansy Birkeland,tansy.birkeland@example.com,Full groom,94.00
+2025-01-18,Mika Sorensen,mika.sorensen@example.com,Bath & brush,68.00
+2025-01-18,Yusuf Mercado,yusuf.mercado@example.com,Full groom + de-shed,73.00
+2025-01-19,Bess Jernigan,bess.jernigan@example.com,Puppy intro groom,58.00
+2025-01-19,Nell Eastman,nell.eastman@example.com,Nail trim,93.00
+2025-01-19,Pilar Northcutt,pilar.northcutt@example.com,De-shed treatment,84.00
+2025-01-19,Umberto Ainsley,umberto.ainsley@example.com,Nail trim,54.00
+2025-01-20,Hana Thackeray,hana.thackeray@example.com,Teeth & nails,50.00
+2025-01-20,Pilar Thackeray,pilar.thackeray@example.com,Bath & brush,93.00
+2025-01-21,Hollis Obradovic,hollis.obradovic@example.com,Teeth & nails,55.00
+2025-01-21,Tansy Xiong,tansy.xiong@example.com,Full groom,53.00
+2025-01-22,Hana Drummond,hana.drummond@example.com,De-shed treatment,103.00
+2025-01-23,Hana Ainsley,hana.ainsley@example.com,Full groom + de-shed,81.00
+2025-01-23,Umberto Drummond,umberto.drummond@example.com,Bath & brush,73.00
+2025-01-23,Ximena Vanterpool,ximena.vanterpool@example.com,Full groom,49.00
+2025-01-24,Arlo Quill,arlo.quill@example.com,Teeth & nails,92.00
+2025-01-24,Gideon Northcutt,gideon.northcutt@example.com,Full groom + de-shed,71.00
+2025-01-24,Kenji Cuthbert,kenji.cuthbert@example.com,Full groom,47.00
+2025-01-24,Moss Sandoval,moss.sandoval@example.com,Teeth & nails,90.00
+2025-01-24,Nell Birkeland,nell.birkeland@example.com,Nail trim,47.00
+2025-01-24,Pilar Cuthbert,pilar.cuthbert@example.com,De-shed treatment,67.00
+2025-01-24,Quentin Umali,quentin.umali@example.com,Full groom + de-shed,73.00
+2025-01-24,Rosa Northcutt,rosa.northcutt@example.com,Puppy intro groom,91.00
+2025-01-25,Imogen Xiong,imogen.xiong@example.com,Puppy intro groom,75.00
+2025-01-25,Ximena Delgado,ximena.delgado@example.com,Full groom + de-shed,104.00
+2025-01-26,Nia Vanterpool,nia.vanterpool@example.com,De-shed treatment,68.00
+2025-01-28,Arlo Delgado,arlo.delgado@example.com,Full groom + de-shed,109.00
+2025-01-28,Marisol Quintana,marisol.q@example.com,Full groom,80.00
+2025-01-28,Yusuf Fairweather,yusuf.fairweather@example.com,Full groom,89.00
+2025-01-29,Gideon Bostwick,gideon.bostwick@example.com,Full groom + de-shed,75.00
+2025-01-30,Caleb Fairweather,caleb.fairweather@example.com,Puppy intro groom,69.00
+2025-01-30,Hollis Jernigan,hollis.jernigan@example.com,Puppy intro groom,117.00
+2025-01-30,Pilar Abernathy,pilar.abernathy@example.com,Bath & brush,95.00
+2025-01-30,Wendell Umali,wendell.umali@example.com,Bath & brush,90.00
+2025-01-31,Desmond Delgado,desmond.delgado@example.com,Bath & brush,94.00
+2025-02-01,Caleb Rasmussen,caleb.rasmussen@example.com,De-shed treatment,55.00
+2025-02-01,Quentin Goodall,quentin.goodall@example.com,Full groom + de-shed,62.00
+2025-02-01,Umberto Quill,umberto.quill@example.com,De-shed treatment,48.00
+2025-02-02,Caleb Drummond,caleb.drummond@example.com,Puppy intro groom,97.00
+2025-02-02,Cora Vanterpool,cora.vanterpool@example.com,De-shed treatment,78.00
+2025-02-02,Jonas Edelman,jonas.edelman@example.com,Puppy intro groom,80.00
+2025-02-03,Bennett Kowalczyk,bennett.kowalczyk@example.com,Puppy intro groom,64.00
+2025-02-03,Gus Sandoval,gus.sandoval@example.com,Full groom + de-shed,72.00
+2025-02-04,Aiyana Fairweather,aiyana.fairweather@example.com,De-shed treatment,83.00
+2025-02-04,Lorena Xiong,lorena.xiong@example.com,Puppy intro groom,81.00
+2025-02-04,Nia Ainsley,nia.ainsley@example.com,Full groom,77.00
+2025-02-04,Ximena Xiong,ximena.xiong@example.com,Full groom + de-shed,67.00
+2025-02-05,Wendell Calloway,wendell.calloway@example.com,Full groom,63.00
+2025-02-06,Gus Umali,gus.umali@example.com,Puppy intro groom,112.00
+2025-02-06,Nell Umali,nell.umali@example.com,Full groom,88.00
+2025-02-07,Gideon Drummond,gideon.drummond@example.com,Teeth & nails,95.00
+2025-02-07,Rosa Pemberton,rosa.pemberton@example.com,Teeth & nails,77.00
+2025-02-08,Elif Zeller,elif.zeller@example.com,De-shed treatment,80.00
+2025-02-08,Nia Xiong,nia.xiong@example.com,Puppy intro groom,57.00
+2025-02-09,Bess Jernigan,bess.jernigan@example.com,Full groom + de-shed,71.00
+2025-02-10,Theo Branagh,theo.branagh@example.com,Puppy intro groom,95.00
+2025-02-11,Cora Whitlock,cora.whitlock@example.com,Puppy intro groom,89.00
+2025-02-11,Pilar Northcutt,pilar.northcutt@example.com,Puppy intro groom,93.00
+2025-02-12,Tansy Birkeland,tansy.birkeland@example.com,De-shed treatment,99.00
+2025-02-14,Elif Lindqvist,elif.lindqvist@example.com,Full groom + de-shed,102.00
+2025-02-14,Yusuf Mercado,yusuf.mercado@example.com,Full groom,71.00
+2025-02-16,Nell Birkeland,nell.birkeland@example.com,De-shed treatment,47.00
+2025-02-16,Pilar Cuthbert,pilar.cuthbert@example.com,Puppy intro groom,66.00
+2025-02-16,Tansy Obradovic,tansy.obradovic@example.com,Bath & brush,118.00
+2025-02-17,Imogen Bostwick,imogen.bostwick@example.com,Puppy intro groom,81.00
+2025-02-17,Matteo Ibarra,matteo.ibarra@example.com,Bath & brush,51.00
+2025-02-17,Nia Vanterpool,nia.vanterpool@example.com,De-shed treatment,71.00
+2025-02-18,Lela Fairweather,lela.fairweather@example.com,Bath & brush,88.00
+2025-02-18,Wendell Umali,wendell.umali@example.com,Puppy intro groom,90.00
+2025-02-19,Hana Drummond,hana.drummond@example.com,Full groom,113.00
+2025-02-20,Arlo Quill,arlo.quill@example.com,Bath & brush,81.00
+2025-02-20,Caleb Fairweather,caleb.fairweather@example.com,Full groom,72.00
+2025-02-20,Cora Pemberton,cora.pemberton@example.com,Full groom + de-shed,87.00
+2025-02-20,Moss Sandoval,moss.sandoval@example.com,Full groom,82.00
+2025-02-20,Silas Xiong,silas.xiong@example.com,Puppy intro groom,95.00
+2025-02-20,Tansy Northcutt,tansy.northcutt@example.com,Nail trim,69.00
+2025-02-21,Elif Birkeland,elif.birkeland@example.com,Bath & brush,99.00
+2025-02-21,Nell Eastman,nell.eastman@example.com,Full groom,88.00
+2025-02-21,Quentin Umali,quentin.umali@example.com,Full groom + de-shed,65.00
+2025-02-21,Umberto Calloway,umberto.calloway@example.com,Full groom,88.00
+2025-02-21,Ximena Delgado,ximena.delgado@example.com,De-shed treatment,113.00
+2025-02-22,Fern Xiong,fern.xiong@example.com,Full groom + de-shed,63.00
+2025-02-22,Gideon Bostwick,gideon.bostwick@example.com,Teeth & nails,74.00
+2025-02-22,Imogen Xiong,imogen.xiong@example.com,Bath & brush,72.00
+2025-02-22,Mika Sorensen, mika.sorensen@example.com,Bath & brush,65.00
+2025-02-23,Gideon Northcutt,gideon.northcutt@example.com,Nail trim,70.00
+2025-02-23,Hana Ainsley,hana.ainsley@example.com,De-shed treatment,82.00
+2025-02-23,Hollis Obradovic,hollis.obradovic@example.com,De-shed treatment,51.00
+2025-02-24,Aiyana Delgado,aiyana.delgado@example.com,Puppy intro groom,99.00
+2025-02-24,Gus Whitlock,gus.whitlock@example.com,Full groom,75.00
+2025-02-25,Caleb Rasmussen,caleb.rasmussen@example.com,Full groom + de-shed,57.00
+2025-02-25,Marisol Quintana,marisol.q@example.com,Bath & brush,81.00
+2025-02-25,Rosa Northcutt,rosa.northcutt@example.com,Full groom + de-shed,83.00
+2025-02-25,Ximena Xiong,ximena.xiong@example.com,Full groom,73.00
+2025-02-26,Nell Umali,nell.umali@example.com,Full groom,103.00
+2025-02-27,Elif Zeller,elif.zeller@example.com,Full groom + de-shed,73.00
+2025-02-27,Hana Thackeray,hana.thackeray@example.com,Nail trim,58.00
+2025-02-27,Lela Zeller,lela.zeller@example.com,Nail trim,64.00
+2025-02-27,Lorena Ainsley,lorena.ainsley@example.com,Teeth & nails,65.00
+2025-02-27,Quentin Goodall,quentin.goodall@example.com,Full groom,72.00
+2025-02-28,Bess Jernigan,bess.jernigan@example.com,Teeth & nails,61.00
+2025-02-28,Lorena Xiong,lorena.xiong@example.com,De-shed treatment,88.00
+2025-03-01,Hollis Jernigan,hollis.jernigan@example.com,De-shed treatment,118.00
+2025-03-01,Rosa Lindqvist,rosa.lindqvist@example.com,Full groom + de-shed,53.00
+2025-03-01,Umberto Quill,umberto.quill@example.com,Bath & brush,61.00
+2025-03-02,Emory Cuthbert,emory.cuthbert@example.com,De-shed treatment,73.00
+2025-03-02,Wendell Yarborough,wendell.yarborough@example.com,Puppy intro groom,72.00
+2025-03-03,Caleb Drummond,caleb.drummond@example.com,De-shed treatment,87.00
+2025-03-05,Gus Sandoval,gus.sandoval@example.com,Nail trim,77.00
+2025-03-05,Gus Umali,gus.umali@example.com,Full groom + de-shed,116.00
+2025-03-05,Pilar Northcutt,pilar.northcutt@example.com,Full groom + de-shed,90.00
+2025-03-05,Umberto Ainsley,umberto.ainsley@example.com,Full groom,48.00
+2025-03-05,Umberto Drummond,umberto.drummond@example.com,Full groom + de-shed,58.00
+2025-03-06,Cora Vanterpool,cora.vanterpool@example.com,Bath & brush,74.00
+2025-03-07,Pilar Thackeray,pilar.thackeray@example.com,Full groom + de-shed,95.00
+2025-03-08,Farrah Ainsley,farrah.ainsley@example.com,Teeth & nails,79.00
+2025-03-09,Nia Vanterpool,nia.vanterpool@example.com,Bath & brush,69.00
+2025-03-09,Nia Xiong,nia.xiong@example.com,Nail trim,64.00
+2025-03-09,Odette Calloway,odette.calloway@example.com,De-shed treatment,111.00
+2025-03-09,Wendell Umali,wendell.umali@example.com,De-shed treatment,80.00
+2025-03-10,Nell Birkeland,nell.birkeland@example.com,Full groom + de-shed,61.00
+2025-03-10,Rosa Pemberton,rosa.pemberton@example.com,Full groom + de-shed,80.00
+2025-03-11,Tansy Birkeland,tansy.birkeland@example.com,Nail trim,101.00
+2025-03-12,Kenji Cuthbert,kenji.cuthbert@example.com,Nail trim,47.00
+2025-03-13,Caleb Fairweather,caleb.fairweather@example.com,Full groom + de-shed,65.00
+2025-03-13,Cora Umali,cora.umali@example.com,Bath & brush,67.00
+2025-03-13,Jules Ainsley,jules.ainsley@example.com,Puppy intro groom,60.00
+2025-03-13,Matteo Obradovic,matteo.obradovic@example.com,De-shed treatment,87.00
+2025-03-13,Nia Ainsley,nia.ainsley@example.com,Full groom,62.00
+2025-03-13,Pilar Cuthbert,pilar.cuthbert@example.com,Nail trim,77.00
+2025-03-13,Vera Sandoval,vera.sandoval@example.com,Bath & brush,75.00
+2025-03-15,Wendell Calloway,wendell.calloway@example.com,Full groom,71.00
+2025-03-16,Kit Cuthbert,kit.cuthbert@example.com,Nail trim,120.00
+2025-03-16,Yusuf Fairweather,yusuf.fairweather@example.com,Nail trim,77.00
+2025-03-16,Yusuf Mercado,yusuf.mercado@example.com,Teeth & nails,66.00
+2025-03-17,Jonas Edelman,jonas.edelman@example.com,Full groom + de-shed,76.00
+2025-03-17,Tansy Obradovic,tansy.obradovic@example.com,Bath & brush,103.00
+2025-03-17,Tansy Xiong,tansy.xiong@example.com,Puppy intro groom,62.00
+2025-03-17,Ximena Vanterpool,ximena.vanterpool@example.com,Bath & brush,49.00
+2025-03-17,Ximena Xiong,ximena.xiong@example.com,Bath & brush,60.00
+2025-03-18,Desmond Delgado,desmond.delgado@example.com,Nail trim,88.00
+2025-03-18,Elif Lindqvist,elif.lindqvist@example.com,Full groom + de-shed,87.00
+2025-03-18,Gideon Bostwick,gideon.bostwick@example.com,Teeth & nails,78.00
+2025-03-18,Nell Umali,nell.umali@example.com,Nail trim,93.00
+2025-03-19,Bess Jernigan,bess.jernigan@example.com,Full groom + de-shed,67.00
+2025-03-19,Lela Birkeland,lela.birkeland@example.com,Puppy intro groom,110.00
+2025-03-19,Nell Zeller,nell.zeller@example.com,Bath & brush,113.00
+2025-03-19,Theo Branagh,theo.branagh@example.com,Nail trim,99.00
+2025-03-20,Arlo Quill,arlo.quill@example.com,Nail trim,80.00
+2025-03-20,Caleb Rasmussen,caleb.rasmussen@example.com,Full groom,51.00
+2025-03-20,Hana Drummond,hana.drummond@example.com,Full groom + de-shed,118.00
+2025-03-20,Nell Drummond,nell.drummond@example.com,Full groom + de-shed,118.00
+2025-03-20,Pilar Ainsley,pilar.ainsley@example.com,Bath & brush,87.00
+2025-03-21,Arlo Delgado,arlo.delgado@example.com,De-shed treatment,110.00
+2025-03-21,Moss Sandoval,moss.sandoval@example.com,Teeth & nails,84.00
+2025-03-22,Aiyana Fairweather,aiyana.fairweather@example.com,Teeth & nails,82.00
+2025-03-22,Elif Zeller,elif.zeller@example.com,De-shed treatment,76.00
+2025-03-22,Quentin Umali,quentin.umali@example.com,Teeth & nails,65.00
+2025-03-22,Ximena Delgado,ximena.delgado@example.com,Puppy intro groom,113.00
+2025-03-24,Nell Eastman,nell.eastman@example.com,Nail trim,82.00
+2025-03-24,Rosa Northcutt,rosa.northcutt@example.com,Full groom,88.00
+2025-03-25,Aiyana Delgado,aiyana.delgado@example.com,Puppy intro groom,93.00
+2025-03-25,Hollis Obradovic,hollis.obradovic@example.com,Teeth & nails,53.00
+2025-03-25,Lela Fairweather,lela.fairweather@example.com,Teeth & nails,87.00
+2025-03-25,Marisol Quintana,marisol.q@example.com,Full groom,79.00
+2025-03-25,Mika Sorensen, mika.sorensen@example.com,Bath & brush,74.00
+2025-03-25,Pilar Northcutt,pilar.northcutt@example.com,Full groom + de-shed,81.00
+2025-03-25,Quentin Goodall,quentin.goodall@example.com,De-shed treatment,70.00
+2025-03-26,Gideon Northcutt,gideon.northcutt@example.com,Full groom + de-shed,57.00
+2025-03-26,Imogen Xiong,imogen.xiong@example.com,Teeth & nails,76.00
+2025-03-26,Lorena Xiong,lorena.xiong@example.com,Bath & brush,82.00
+2025-03-27,Wendell Northcutt,wendell.northcutt@example.com,Full groom,49.00
+2025-03-28,Cora Whitlock,cora.whitlock@example.com,Bath & brush,81.00
+2025-03-28,Hana Ainsley,hana.ainsley@example.com,Puppy intro groom,85.00
+2025-03-28,Nell Thackeray,nell.thackeray@example.com,Teeth & nails,63.00
+2025-03-29,Nia Mercado,nia.mercado@example.com,De-shed treatment,109.00
+2025-03-29,Wendell Umali,wendell.umali@example.com,Puppy intro groom,87.00
+2025-03-30,Bennett Kowalczyk,bennett.kowalczyk@example.com,Nail trim,69.00
+2025-03-30,Hollis Jernigan,hollis.jernigan@example.com,Nail trim,110.00
+2025-03-30,Nia Vanterpool,nia.vanterpool@example.com,De-shed treatment,71.00
+2025-03-31,Gus Umali,gus.umali@example.com,Teeth & nails,102.00
+2025-03-31,Wendell Cuthbert,wendell.cuthbert@example.com,Teeth & nails,62.00
+2025-04-01,Cora Pemberton,cora.pemberton@example.com,Teeth & nails,87.00
+2025-04-01,Fern Xiong,fern.xiong@example.com,Full groom + de-shed,62.00
+2025-04-01,Moss Kowalczyk,moss.kowalczyk@example.com,Bath & brush,76.00
+2025-04-02,Hana Thackeray,hana.thackeray@example.com,Full groom + de-shed,47.00
+2025-04-02,Nell Birkeland,nell.birkeland@example.com,Bath & brush,61.00
+2025-04-02,Quentin Cuthbert,quentin.cuthbert@example.com,Bath & brush,70.00
+2025-04-02,Yusuf Delgado,yusuf.delgado@example.com,Full groom,55.00
+2025-04-03,Caleb Fairweather,caleb.fairweather@example.com,Bath & brush,72.00
+2025-04-03,Emory Cuthbert,emory.cuthbert@example.com,Teeth & nails,86.00
+2025-04-03,Quentin Thackeray,quentin.thackeray@example.com,Full groom,56.00
+2025-04-03,Umberto Quill,umberto.quill@example.com,Nail trim,52.00
+2025-04-04,Arlo Cuthbert,arlo.cuthbert@example.com,De-shed treatment,117.00
+2025-04-04,Gus Sandoval,gus.sandoval@example.com,Teeth & nails,87.00
+2025-04-04,Tansy Birkeland,tansy.birkeland@example.com,Full groom + de-shed,95.00
+2025-04-05,Caleb Drummond,caleb.drummond@example.com,Nail trim,101.00
+2025-04-05,Ximena Xiong,ximena.xiong@example.com,Full groom + de-shed,68.00
+2025-04-06,Imogen Bostwick,imogen.bostwick@example.com,Nail trim,81.00
+2025-04-07,Aiyana Umali,aiyana.umali@example.com,Bath & brush,92.00
+2025-04-07,Elif Birkeland,elif.birkeland@example.com,Full groom,88.00
+2025-04-07,Lela Zeller,lela.zeller@example.com,Puppy intro groom,62.00
+2025-04-07,Odette Calloway,odette.calloway@example.com,Teeth & nails,107.00
+2025-04-07,Rosa Pemberton,rosa.pemberton@example.com,Full groom,82.00
+2025-04-08,Nia Xiong,nia.xiong@example.com,Full groom,59.00
+2025-04-09,Bess Jernigan,bess.jernigan@example.com,Full groom + de-shed,66.00
+2025-04-09,Gus Whitlock,gus.whitlock@example.com,Bath & brush,78.00
+2025-04-09,Ida Vanterpool,ida.vanterpool@example.com,Nail trim,118.00
+2025-04-09,Nell Umali,nell.umali@example.com,Full groom + de-shed,100.00
+2025-04-09,Pilar Ainsley,pilar.ainsley@example.com,De-shed treatment,92.00
+2025-04-09,Pilar Cuthbert,pilar.cuthbert@example.com,Teeth & nails,78.00
+2025-04-10,Jasper Zeller,jasper.zeller@example.com,Full groom,73.00
+2025-04-11,Cora Vanterpool,cora.vanterpool@example.com,De-shed treatment,84.00
+2025-04-11,Elif Fairweather,elif.fairweather@example.com,Full groom,85.00
+2025-04-11,Hollis Quill,hollis.quill@example.com,Puppy intro groom,89.00
+2025-04-11,Tansy Bostwick,tansy.bostwick@example.com,Full groom,58.00
+2025-04-12,Kit Obradovic,kit.obradovic@example.com,Puppy intro groom,57.00
+2025-04-13,Elif Zeller,elif.zeller@example.com,Teeth & nails,75.00
+2025-04-13,Gideon Bostwick,gideon.bostwick@example.com,Bath & brush,80.00
+2025-04-13,Matteo Ibarra,matteo.ibarra@example.com,Full groom + de-shed,52.00
+2025-04-14,Arlo Vanterpool,arlo.vanterpool@example.com,Nail trim,64.00
+2025-04-14,Lela Birkeland,lela.birkeland@example.com,Full groom + de-shed,107.00
+2025-04-14,Nia Ainsley,nia.ainsley@example.com,Puppy intro groom,68.00
+2025-04-14,Tansy Obradovic,tansy.obradovic@example.com,Full groom + de-shed,118.00
+2025-04-14,Umberto Drummond,umberto.drummond@example.com,Teeth & nails,63.00
+2025-04-14,Yusuf Mercado,yusuf.mercado@example.com,Full groom,72.00
+2025-04-15,Nell Zeller,nell.zeller@example.com,Full groom + de-shed,111.00
+2025-04-15,Pilar Northcutt,pilar.northcutt@example.com,Puppy intro groom,93.00
+2025-04-15,Tansy Northcutt,tansy.northcutt@example.com,Puppy intro groom,72.00
+2025-04-16,Caleb Rasmussen,caleb.rasmussen@example.com,Puppy intro groom,53.00
+2025-04-16,Hollis Ainsley,hollis.ainsley@example.com,Puppy intro groom,78.00
+2025-04-17,Wendell Umali,wendell.umali@example.com,Full groom + de-shed,79.00
+2025-04-18,Hana Drummond,hana.drummond@example.com,Puppy intro groom,103.00
+2025-04-18,Moss Sandoval,moss.sandoval@example.com,Bath & brush,83.00
+2025-04-19,Arlo Quill,arlo.quill@example.com,Teeth & nails,81.00
+2025-04-19,Evelyn Hartree,evelyn.hartree@example.com,Full groom + de-shed,160.00
+2025-04-19,Ximena Delgado,ximena.delgado@example.com,Full groom + de-shed,115.00
+2025-04-19,Yusuf Birkeland,yusuf.birkeland@example.com,Nail trim,93.00
+2025-04-20,Lorena Xiong,lorena.xiong@example.com,Nail trim,85.00
+2025-04-20,Nia Vanterpool,nia.vanterpool@example.com,Bath & brush,69.00
+2025-04-20,Quentin Goodall,quentin.goodall@example.com,Nail trim,65.00
+2025-04-20,Quentin Umali,quentin.umali@example.com,Teeth & nails,64.00
+2025-04-20,Umberto Ainsley,umberto.ainsley@example.com,Teeth & nails,51.00
+2025-04-21,Kenji Pemberton,kenji.pemberton@example.com,Bath & brush,85.00
+2025-04-21,Rosa Northcutt,rosa.northcutt@example.com,Full groom,77.00
+2025-04-21,Tansy Kowalczyk,tansy.kowalczyk@example.com,Bath & brush,48.00
+2025-04-21,Wendell Calloway,wendell.calloway@example.com,Full groom,77.00
+2025-04-21,Wendell Yarborough,wendell.yarborough@example.com,De-shed treatment,64.00
+2025-04-22,Bennett Eastman,bennett.eastman@example.com,Full groom + de-shed,114.00
+2025-04-22,Marisol Quintana,marisol.q@example.com,Bath & brush,81.00
+2025-04-22,Silas Xiong,silas.xiong@example.com,Teeth & nails,102.00
+2025-04-22,Theo Branagh,theo.branagh@example.com,Nail trim,94.00
+2025-04-22,Umberto Calloway,umberto.calloway@example.com,Puppy intro groom,81.00
+2025-04-23,Elif Lindqvist,elif.lindqvist@example.com,Full groom,94.00
+2025-04-23,Imogen Xiong,imogen.xiong@example.com,Full groom + de-shed,78.00
+2025-04-23,Jonas Edelman,jonas.edelman@example.com,Teeth & nails,70.00
+2025-04-23,Lorena Ainsley,lorena.ainsley@example.com,Bath & brush,71.00
+2025-04-23,Wendell Cuthbert,wendell.cuthbert@example.com,Puppy intro groom,63.00
+2025-04-24,Aiyana Delgado,aiyana.delgado@example.com,Full groom + de-shed,88.00
+2025-04-24,Caleb Fairweather,caleb.fairweather@example.com,Full groom,73.00
+2025-04-24,Hana Ainsley,hana.ainsley@example.com,Teeth & nails,90.00
+2025-04-24,Nell Birkeland,nell.birkeland@example.com,Bath & brush,63.00
+2025-04-24,Nell Eastman,nell.eastman@example.com,Bath & brush,87.00
+2025-04-24,Ximena Xiong,ximena.xiong@example.com,Teeth & nails,73.00
+2025-04-26,Hollis Obradovic,hollis.obradovic@example.com,Nail trim,60.00
+2025-04-26,Lela Fairweather,lela.fairweather@example.com,De-shed treatment,98.00
+2025-04-27,Moss Kowalczyk,moss.kowalczyk@example.com,Full groom + de-shed,86.00
+2025-04-28,Gideon Northcutt,gideon.northcutt@example.com,De-shed treatment,67.00
+2025-04-28,Gus Umali,gus.umali@example.com,Teeth & nails,115.00
+2025-04-28,Pilar Thackeray,pilar.thackeray@example.com,Bath & brush,100.00
+2025-04-28,Quentin Bostwick,quentin.bostwick@example.com,Full groom,108.00
+2025-04-28,Quentin Cuthbert,quentin.cuthbert@example.com,Full groom + de-shed,59.00
+2025-04-29,Hollis Jernigan,hollis.jernigan@example.com,De-shed treatment,103.00
+2025-04-29,Mika Sorensen, mika.sorensen@example.com,Bath & brush,70.00
+2025-04-29,Tansy Birkeland,tansy.birkeland@example.com,Bath & brush,98.00
+2025-04-29,Tansy Fairweather,tansy.fairweather@example.com,Full groom + de-shed,71.00
+2025-04-30,Aiyana Umali,aiyana.umali@example.com,Teeth & nails,90.00
+2025-04-30,Nell Umali,nell.umali@example.com,Full groom + de-shed,102.00
+2025-05-01,Bess Thackeray,bess.thackeray@example.com,Puppy intro groom,48.00
+2025-05-01,Pilar Ainsley,pilar.ainsley@example.com,Full groom,81.00
+2025-05-01,Rosa Lindqvist,rosa.lindqvist@example.com,Puppy intro groom,61.00
+2025-05-01,Yusuf Fairweather,yusuf.fairweather@example.com,Bath & brush,90.00
+2025-05-02,Bess Jernigan,bess.jernigan@example.com,Bath & brush,62.00
+2025-05-02,Elif Zeller,elif.zeller@example.com,Bath & brush,74.00
+2025-05-02,Hana Jernigan,hana.jernigan@example.com,Puppy intro groom,108.00
+2025-05-03,Desmond Delgado,desmond.delgado@example.com,Puppy intro groom,93.00
+2025-05-03,Pilar Cuthbert,pilar.cuthbert@example.com,Full groom + de-shed,75.00
+2025-05-03,Umberto Quill,umberto.quill@example.com,Teeth & nails,62.00
+2025-05-03,Ximena Vanterpool,ximena.vanterpool@example.com,Bath & brush,51.00
+2025-05-04,Hana Thackeray,hana.thackeray@example.com,Bath & brush,52.00
+2025-05-04,Kenji Cuthbert,kenji.cuthbert@example.com,Bath & brush,52.00
+2025-05-04,Pilar Northcutt,pilar.northcutt@example.com,De-shed treatment,77.00
+2025-05-04,Quentin Thackeray,quentin.thackeray@example.com,Bath & brush,60.00
+2025-05-04,Tansy Bostwick,tansy.bostwick@example.com,Bath & brush,51.00
+2025-05-05,Cora Whitlock,cora.whitlock@example.com,De-shed treatment,83.00
+2025-05-05,Fern Xiong,fern.xiong@example.com,Full groom,56.00
+2025-05-05,Matteo Obradovic,matteo.obradovic@example.com,Nail trim,93.00
+2025-05-05,Nell Drummond,nell.drummond@example.com,De-shed treatment,113.00
+2025-05-05,Odette Calloway,odette.calloway@example.com,Teeth & nails,103.00
+2025-05-06,Caleb Drummond,caleb.drummond@example.com,Puppy intro groom,92.00
+2025-05-06,Gus Sandoval,gus.sandoval@example.com,Full groom + de-shed,86.00
+2025-05-06,Wendell Umali,wendell.umali@example.com,Puppy intro groom,84.00
+2025-05-07,Arlo Cuthbert,arlo.cuthbert@example.com,Puppy intro groom,108.00
+2025-05-07,Arlo Ibarra,arlo.ibarra@example.com,Bath & brush,107.00
+2025-05-07,Gideon Bostwick,gideon.bostwick@example.com,Nail trim,86.00
+2025-05-07,Oscar Birkeland,oscar.birkeland@example.com,Nail trim,63.00
+2025-05-08,Nia Xiong,nia.xiong@example.com,Puppy intro groom,59.00
+2025-05-08,Rosa Pemberton,rosa.pemberton@example.com,De-shed treatment,82.00
+2025-05-09,Kit Zeller,kit.zeller@example.com,Full groom + de-shed,70.00
+2025-05-09,Lela Lindqvist,lela.lindqvist@example.com,Nail trim,65.00
+2025-05-09,Lorena Pemberton,lorena.pemberton@example.com,Puppy intro groom,61.00
+2025-05-09,Nia Vanterpool,nia.vanterpool@example.com,Teeth & nails,67.00
+2025-05-10,Caleb Rasmussen,caleb.rasmussen@example.com,De-shed treatment,48.00
+2025-05-10,Farrah Ainsley,farrah.ainsley@example.com,Full groom,84.00
+2025-05-11,Aiyana Fairweather,aiyana.fairweather@example.com,Teeth & nails,87.00
+2025-05-11,Emory Cuthbert,emory.cuthbert@example.com,Nail trim,74.00
+2025-05-11,Greta Faulkner,greta.faulkner@example.com,Bath & brush,60.00
+2025-05-11,Nell Zeller,nell.zeller@example.com,Nail trim,115.00
+2025-05-12,Arlo Delgado,arlo.delgado@example.com,Puppy intro groom,102.00
+2025-05-12,Cora Pemberton,cora.pemberton@example.com,Nail trim,92.00
+2025-05-12,Lela Birkeland,lela.birkeland@example.com,Bath & brush,102.00
+2025-05-12,Lorena Birkeland,lorena.birkeland@example.com,Nail trim,66.00
+2025-05-13,Cora Umali,cora.umali@example.com,Full groom,64.00
+2025-05-13,Kit Obradovic,kit.obradovic@example.com,Nail trim,63.00
+2025-05-13,Lorena Xiong,lorena.xiong@example.com,De-shed treatment,78.00
+2025-05-13,Nell Birkeland,nell.birkeland@example.com,Nail trim,52.00
+2025-05-13,Nia Mercado,nia.mercado@example.com,De-shed treatment,107.00
+2025-05-13,Silas Cuthbert,silas.cuthbert@example.com,Full groom + de-shed,58.00
+2025-05-13,Yusuf Mercado,yusuf.mercado@example.com,Teeth & nails,65.00
+2025-05-14,Ximena Xiong,ximena.xiong@example.com,Full groom + de-shed,69.00
+2025-05-15,Arlo Quill,arlo.quill@example.com,Full groom + de-shed,91.00
+2025-05-15,Caleb Fairweather,caleb.fairweather@example.com,Puppy intro groom,64.00
+2025-05-15,Cora Vanterpool,cora.vanterpool@example.com,De-shed treatment,78.00
+2025-05-15,Tansy Obradovic,tansy.obradovic@example.com,Nail trim,102.00
+2025-05-16,Gus Mercado,gus.mercado@example.com,Teeth & nails,76.00
+2025-05-16,Hana Drummond,hana.drummond@example.com,Full groom + de-shed,115.00
+2025-05-16,Moss Sandoval,moss.sandoval@example.com,Full groom + de-shed,81.00
+2025-05-16,Nia Ainsley,nia.ainsley@example.com,De-shed treatment,77.00
+2025-05-16,Tansy Xiong,tansy.xiong@example.com,De-shed treatment,58.00
+2025-05-17,Ida Vanterpool,ida.vanterpool@example.com,De-shed treatment,118.00
+2025-05-17,Lela Yarborough,lela.yarborough@example.com,Full groom,120.00
+2025-05-17,Quentin Umali,quentin.umali@example.com,Full groom + de-shed,77.00
+2025-05-17,Wendell Cuthbert,wendell.cuthbert@example.com,Full groom,63.00
+2025-05-18,Nell Thackeray,nell.thackeray@example.com,Teeth & nails,62.00
+2025-05-18,Nia Eastman,nia.eastman@example.com,Full groom + de-shed,60.00
+2025-05-19,Marisol Quintana,marisol.q@example.com,Full groom,82.00
+2025-05-19,Ximena Delgado,ximena.delgado@example.com,De-shed treatment,117.00
+2025-05-20,Bennett Eastman,bennett.eastman@example.com,Puppy intro groom,109.00
+2025-05-20,Lela Zeller,lela.zeller@example.com,De-shed treatment,71.00
+2025-05-20,Quentin Goodall,quentin.goodall@example.com,Full groom + de-shed,74.00
+2025-05-20,Umberto Obradovic,umberto.obradovic@example.com,Bath & brush,96.00
+2025-05-21,Nell Eastman,nell.eastman@example.com,Bath & brush,88.00
+2025-05-21,Tansy Kowalczyk,tansy.kowalczyk@example.com,Teeth & nails,49.00
+2025-05-22,Imogen Bostwick,imogen.bostwick@example.com,De-shed treatment,83.00
+2025-05-23,Bennett Kowalczyk,bennett.kowalczyk@example.com,Bath & brush,78.00
+2025-05-23,Bess Jernigan,bess.jernigan@example.com,Full groom + de-shed,58.00
+2025-05-23,Imogen Xiong,imogen.xiong@example.com,Bath & brush,86.00
+2025-05-23,Moss Kowalczyk,moss.kowalczyk@example.com,Bath & brush,78.00
+2025-05-23,Nell Umali,nell.umali@example.com,Puppy intro groom,94.00
+2025-05-23,Pilar Northcutt,pilar.northcutt@example.com,De-shed treatment,88.00
+2025-05-23,Umberto Drummond,umberto.drummond@example.com,Puppy intro groom,63.00
+2025-05-24,Aiyana Delgado,aiyana.delgado@example.com,Nail trim,102.00
+2025-05-24,Pilar Ainsley,pilar.ainsley@example.com,Full groom + de-shed,81.00
+2025-05-24,Pilar Umali,pilar.umali@example.com,Teeth & nails,89.00
+2025-05-24,Rosa Northcutt,rosa.northcutt@example.com,Full groom,89.00
+2025-05-24,Wendell Northcutt,wendell.northcutt@example.com,Full groom + de-shed,59.00
+2025-05-24,Yusuf Delgado,yusuf.delgado@example.com,De-shed treatment,60.00
+2025-05-25,Aiyana Umali,aiyana.umali@example.com,Bath & brush,79.00
+2025-05-25,Elif Zeller,elif.zeller@example.com,Full groom + de-shed,85.00
+2025-05-25,Gus Umali,gus.umali@example.com,Nail trim,117.00
+2025-05-25,Gus Whitlock,gus.whitlock@example.com,Full groom,73.00
+2025-05-25,Hana Jernigan,hana.jernigan@example.com,De-shed treatment,103.00
+2025-05-25,Tansy Birkeland,tansy.birkeland@example.com,Teeth & nails,88.00
+2025-05-25,Wendell Calloway,wendell.calloway@example.com,Nail trim,70.00
+2025-05-26,Elif Lindqvist,elif.lindqvist@example.com,De-shed treatment,88.00
+2025-05-26,Quentin Cuthbert,quentin.cuthbert@example.com,Bath & brush,58.00
+2025-05-26,Tansy Fairweather,tansy.fairweather@example.com,Bath & brush,67.00
+2025-05-26,Theo Branagh,theo.branagh@example.com,Puppy intro groom,105.00
+2025-05-27,Hana Ainsley,hana.ainsley@example.com,Full groom,92.00
+2025-05-27,Tansy Bostwick,tansy.bostwick@example.com,Full groom,63.00
+2025-05-27,Wendell Umali,wendell.umali@example.com,De-shed treatment,88.00
+2025-05-28,Bennett Goodall,bennett.goodall@example.com,Teeth & nails,88.00
+2025-05-28,Pilar Cuthbert,pilar.cuthbert@example.com,De-shed treatment,76.00
+2025-05-28,Quentin Bostwick,quentin.bostwick@example.com,Teeth & nails,115.00
+2025-05-29,Bess Thackeray,bess.thackeray@example.com,Teeth & nails,53.00
+2025-05-29,Elif Birkeland,elif.birkeland@example.com,Full groom + de-shed,90.00
+2025-05-29,Hollis Ainsley,hollis.ainsley@example.com,Full groom + de-shed,69.00
+2025-05-29,Hollis Jernigan,hollis.jernigan@example.com,Puppy intro groom,102.00
+2025-05-29,Hollis Obradovic,hollis.obradovic@example.com,Nail trim,58.00
+2025-05-29,Nia Vanterpool,nia.vanterpool@example.com,Full groom + de-shed,59.00
+2025-05-30,Arlo Vanterpool,arlo.vanterpool@example.com,Nail trim,63.00
+2025-05-30,Gideon Northcutt,gideon.northcutt@example.com,De-shed treatment,63.00
+2025-05-30,Mika Sorensen,mika.sorensen@example.com,Bath & brush,68.00
+2025-05-31,Quentin Thackeray,quentin.thackeray@example.com,De-shed treatment,57.00
+2025-05-31,Umberto Quill,umberto.quill@example.com,Puppy intro groom,49.00
+2025-06-02,Gideon Bostwick,gideon.bostwick@example.com,Full groom,80.00
+2025-06-02,Jonas Edelman,jonas.edelman@example.com,Full groom + de-shed,79.00
+2025-06-02,Lela Fairweather,lela.fairweather@example.com,Nail trim,97.00
+2025-06-02,Nell Birkeland,nell.birkeland@example.com,Puppy intro groom,52.00
+2025-06-03,Matteo Ibarra,matteo.ibarra@example.com,Bath & brush,58.00
+2025-06-04,Caleb Rasmussen,caleb.rasmussen@example.com,Full groom + de-shed,48.00
+2025-06-04,Gus Sandoval,gus.sandoval@example.com,Puppy intro groom,88.00
+2025-06-04,Odette Calloway,odette.calloway@example.com,Bath & brush,101.00
+2025-06-04,Umberto Ainsley,umberto.ainsley@example.com,Full groom + de-shed,57.00
+2025-06-05,Arlo Cuthbert,arlo.cuthbert@example.com,Puppy intro groom,103.00
+2025-06-05,Caleb Drummond,caleb.drummond@example.com,Puppy intro groom,93.00
+2025-06-05,Hollis Quill,hollis.quill@example.com,Nail trim,99.00
+2025-06-05,Lorena Birkeland,lorena.birkeland@example.com,Teeth & nails,59.00
+2025-06-05,Lorena Xiong,lorena.xiong@example.com,Full groom + de-shed,81.00
+2025-06-05,Nia Xiong,nia.xiong@example.com,Full groom + de-shed,68.00
+2025-06-05,Rosa Pemberton,rosa.pemberton@example.com,Puppy intro groom,78.00
+2025-06-05,Wendell Yarborough,wendell.yarborough@example.com,Teeth & nails,66.00
+2025-06-05,Ximena Xiong,ximena.xiong@example.com,Puppy intro groom,58.00
+2025-06-06,Caleb Fairweather,caleb.fairweather@example.com,De-shed treatment,62.00
+2025-06-06,Fern Xiong,fern.xiong@example.com,De-shed treatment,60.00
+2025-06-06,Jasper Zeller,jasper.zeller@example.com,Teeth & nails,78.00
+2025-06-08,Lela Birkeland,lela.birkeland@example.com,Bath & brush,108.00
+2025-06-08,Nell Zeller,nell.zeller@example.com,Nail trim,116.00
+2025-06-09,Greta Faulkner,greta.faulkner@example.com,De-shed treatment,66.00
+2025-06-10,Arlo Ibarra,arlo.ibarra@example.com,De-shed treatment,118.00
+2025-06-10,Arlo Quill,arlo.quill@example.com,Nail trim,92.00
+2025-06-10,Elif Goodall,elif.goodall@example.com,Bath & brush,85.00
+2025-06-10,Kit Obradovic,kit.obradovic@example.com,Nail trim,48.00
+2025-06-11,Hana Thackeray,hana.thackeray@example.com,Full groom + de-shed,52.00
+2025-06-11,Moss Sandoval,moss.sandoval@example.com,Bath & brush,84.00
+2025-06-11,Nell Umali,nell.umali@example.com,Nail trim,92.00
+2025-06-11,Tansy Northcutt,tansy.northcutt@example.com,Full groom + de-shed,63.00
+2025-06-12,Pilar Ainsley,pilar.ainsley@example.com,Full groom,90.00
+2025-06-12,Wendell Cuthbert,wendell.cuthbert@example.com,Teeth & nails,73.00
+2025-06-12,Yusuf Birkeland,yusuf.birkeland@example.com,Full groom + de-shed,84.00
+2025-06-13,Lela Lindqvist,lela.lindqvist@example.com,De-shed treatment,64.00
+2025-06-13,Pilar Northcutt,pilar.northcutt@example.com,De-shed treatment,93.00
+2025-06-13,Quentin Umali,quentin.umali@example.com,De-shed treatment,76.00
+2025-06-14,Cora Whitlock,cora.whitlock@example.com,De-shed treatment,85.00
+2025-06-14,Yusuf Mercado,yusuf.mercado@example.com,Teeth & nails,71.00
+2025-06-15,Bess Jernigan,bess.jernigan@example.com,Teeth & nails,61.00
+2025-06-15,Hana Drummond,hana.drummond@example.com,De-shed treatment,112.00
+2025-06-15,Kit Zeller,kit.zeller@example.com,Teeth & nails,66.00
+2025-06-15,Silas Cuthbert,silas.cuthbert@example.com,Bath & brush,55.00
+2025-06-15,Tansy Obradovic,tansy.obradovic@example.com,Bath & brush,103.00
+2025-06-15,Ximena Delgado,ximena.delgado@example.com,De-shed treatment,111.00
+2025-06-16,Elif Zeller,elif.zeller@example.com,Bath & brush,74.00
+2025-06-16,Emory Cuthbert,emory.cuthbert@example.com,De-shed treatment,78.00
+2025-06-17,Hana Jernigan,hana.jernigan@example.com,Teeth & nails,108.00
+2025-06-17,Marisol Quintana,marisol.q@example.com,Bath & brush,89.00
+2025-06-17,Nell Drummond,nell.drummond@example.com,Nail trim,111.00
+2025-06-17,Oscar Birkeland,oscar.birkeland@example.com,Bath & brush,76.00
+2025-06-17,Quentin Goodall,quentin.goodall@example.com,Full groom + de-shed,68.00
+2025-06-17,Silas Xiong,silas.xiong@example.com,De-shed treatment,103.00
+2025-06-17,Tansy Birkeland,tansy.birkeland@example.com,Bath & brush,102.00
+2025-06-17,Tansy Bostwick,tansy.bostwick@example.com,Nail trim,53.00
+2025-06-17,Tansy Kowalczyk,tansy.kowalczyk@example.com,Bath & brush,47.00
+2025-06-18,Aiyana Umali,aiyana.umali@example.com,Full groom,88.00
+2025-06-18,Bennett Eastman,bennett.eastman@example.com,Puppy intro groom,107.00
+2025-06-18,Ida Vanterpool,ida.vanterpool@example.com,Full groom + de-shed,113.00
+2025-06-18,Moss Kowalczyk,moss.kowalczyk@example.com,De-shed treatment,84.00
+2025-06-18,Nell Eastman,nell.eastman@example.com,Nail trim,79.00
+2025-06-18,Umberto Obradovic,umberto.obradovic@example.com,Teeth & nails,97.00
+2025-06-19,Nia Vanterpool,nia.vanterpool@example.com,Full groom,57.00
+2025-06-19,Pilar Thackeray,pilar.thackeray@example.com,Full groom,102.00
+2025-06-19,Umberto Calloway,umberto.calloway@example.com,Full groom + de-shed,81.00
+2025-06-19,Wendell Umali,wendell.umali@example.com,Full groom,83.00
+2025-06-20,Lorena Pemberton,lorena.pemberton@example.com,Nail trim,57.00
+2025-06-20,Pilar Cuthbert,pilar.cuthbert@example.com,Full groom + de-shed,78.00
+2025-06-20,Ximena Vanterpool,ximena.vanterpool@example.com,Nail trim,58.00
+2025-06-21,Aiyana Delgado,aiyana.delgado@example.com,Bath & brush,98.00
+2025-06-21,Desmond Delgado,desmond.delgado@example.com,De-shed treatment,103.00
+2025-06-21,Gus Umali,gus.umali@example.com,Full groom + de-shed,118.00
+2025-06-21,Imogen Xiong,imogen.xiong@example.com,Puppy intro groom,87.00
+2025-06-21,Nia Ainsley,nia.ainsley@example.com,Bath & brush,64.00
+2025-06-21,Rosa Northcutt,rosa.northcutt@example.com,Bath & brush,92.00
+2025-06-22,Cora Vanterpool,cora.vanterpool@example.com,Nail trim,85.00
+2025-06-22,Yusuf Fairweather,yusuf.fairweather@example.com,Full groom,89.00
+2025-06-23,Kenji Cuthbert,kenji.cuthbert@example.com,Full groom,52.00
+2025-06-24,Bennett Goodall,bennett.goodall@example.com,Nail trim,89.00
+2025-06-24,Nell Birkeland,nell.birkeland@example.com,Puppy intro groom,48.00
+2025-06-24,Quentin Cuthbert,quentin.cuthbert@example.com,Puppy intro groom,65.00
+2025-06-25,Quentin Bostwick,quentin.bostwick@example.com,De-shed treatment,108.00
+2025-06-26,Cora Pemberton,cora.pemberton@example.com,Full groom + de-shed,86.00
+2025-06-26,Gideon Bostwick,gideon.bostwick@example.com,De-shed treatment,81.00
+2025-06-26,Hana Ainsley,hana.ainsley@example.com,Nail trim,80.00
+2025-06-26,Hollis Obradovic,hollis.obradovic@example.com,De-shed treatment,49.00
+2025-06-26,Nia Mercado,nia.mercado@example.com,Full groom,117.00
+2025-06-26,Tansy Fairweather,tansy.fairweather@example.com,Full groom,70.00
+2025-06-26,Ximena Xiong,ximena.xiong@example.com,Puppy intro groom,70.00
+2025-06-27,Bess Thackeray,bess.thackeray@example.com,Puppy intro groom,50.00
+2025-06-27,Caleb Fairweather,caleb.fairweather@example.com,Nail trim,70.00
+2025-06-27,Caleb Rasmussen,caleb.rasmussen@example.com,Teeth & nails,56.00
+2025-06-27,Matteo Sandoval,matteo.sandoval@example.com,De-shed treatment,120.00
+2025-06-27,Umberto Quill,umberto.quill@example.com,Nail trim,62.00
+2025-06-28,Lorena Birkeland,lorena.birkeland@example.com,Full groom,68.00
+2025-06-28,Theo Branagh,theo.branagh@example.com,De-shed treatment,91.00
+2025-06-29,Matteo Obradovic,matteo.obradovic@example.com,Nail trim,89.00
+2025-06-30,Elif Lindqvist,elif.lindqvist@example.com,De-shed treatment,99.00
+2025-06-30,Hollis Jernigan,hollis.jernigan@example.com,Teeth & nails,106.00
+2025-07-01,Gideon Northcutt,gideon.northcutt@example.com,De-shed treatment,62.00
+2025-07-01,Rosa Lindqvist,rosa.lindqvist@example.com,Nail trim,63.00
+2025-07-01,Wendell Calloway,wendell.calloway@example.com,Nail trim,62.00
+2025-07-02,Aiyana Fairweather,aiyana.fairweather@example.com,Nail trim,77.00
+2025-07-02,Lorena Xiong,lorena.xiong@example.com,Teeth & nails,89.00
+2025-07-02,Quentin Thackeray,quentin.thackeray@example.com,Full groom,58.00
+2025-07-03,Gus Sandoval,gus.sandoval@example.com,Full groom + de-shed,83.00
+2025-07-04,Lela Zeller,lela.zeller@example.com,Teeth & nails,62.00
+2025-07-04,Nell Umali,nell.umali@example.com,Puppy intro groom,94.00
+2025-07-04,Nia Xiong,nia.xiong@example.com,Puppy intro groom,64.00
+2025-07-04,Odette Calloway,odette.calloway@example.com,Bath & brush,107.00
+2025-07-04,Pilar Ainsley,pilar.ainsley@example.com,Bath & brush,87.00
+2025-07-05,Arlo Cuthbert,arlo.cuthbert@example.com,Bath & brush,107.00
+2025-07-05,Caleb Drummond,caleb.drummond@example.com,Full groom + de-shed,103.00
+2025-07-05,Pilar Northcutt,pilar.northcutt@example.com,De-shed treatment,77.00
+2025-07-06,Bess Jernigan,bess.jernigan@example.com,Nail trim,62.00
+2025-07-06,Hollis Ainsley,hollis.ainsley@example.com,Full groom,66.00
+2025-07-06,Lela Birkeland,lela.birkeland@example.com,Nail trim,117.00
+2025-07-06,Mika Sorensen,mika.sorensen@example.com,Bath & brush,72.00
+2025-07-06,Nell Thackeray,nell.thackeray@example.com,Puppy intro groom,58.00
+2025-07-06,Nell Zeller,nell.zeller@example.com,Full groom + de-shed,115.00
+2025-07-06,Rosa Pemberton,rosa.pemberton@example.com,Teeth & nails,84.00
+2025-07-06,Umberto Drummond,umberto.drummond@example.com,Full groom + de-shed,63.00
+2025-07-06,Vera Ainsley,vera.ainsley@example.com,Teeth & nails,95.00
+2025-07-06,Wendell Rasmussen,wendell.rasmussen@example.com,Teeth & nails,95.00
+2025-07-07,Cora Umali,cora.umali@example.com,Puppy intro groom,72.00
+2025-07-07,Elif Zeller,elif.zeller@example.com,Bath & brush,83.00
+2025-07-07,Kit Obradovic,kit.obradovic@example.com,Full groom + de-shed,56.00
+2025-07-07,Lela Fairweather,lela.fairweather@example.com,Nail trim,100.00
+2025-07-07,Tansy Bostwick,tansy.bostwick@example.com,Full groom,63.00
+2025-07-07,Wendell Cuthbert,wendell.cuthbert@example.com,Full groom + de-shed,59.00
+2025-07-08,Arlo Quill,arlo.quill@example.com,Full groom + de-shed,91.00
+2025-07-08,Greta Faulkner,greta.faulkner@example.com,Puppy intro groom,70.00
+2025-07-08,Pilar Umali,pilar.umali@example.com,Puppy intro groom,77.00
+2025-07-09,Nia Vanterpool,nia.vanterpool@example.com,De-shed treatment,62.00
+2025-07-10,Fern Xiong,fern.xiong@example.com,Teeth & nails,53.00
+2025-07-10,Gus Mercado,gus.mercado@example.com,Full groom,74.00
+2025-07-10,Gus Whitlock,gus.whitlock@example.com,Full groom,71.00
+2025-07-10,Hollis Vanterpool,hollis.vanterpool@example.com,Puppy intro groom,95.00
+2025-07-10,Moss Sandoval,moss.sandoval@example.com,De-shed treatment,91.00
+2025-07-10,Tansy Birkeland,tansy.birkeland@example.com,Bath & brush,91.00
+2025-07-11,Emory Ainsley,emory.ainsley@example.com,Full groom,60.00
+2025-07-11,Imogen Bostwick,imogen.bostwick@example.com,Nail trim,85.00
+2025-07-12,Arlo Vanterpool,arlo.vanterpool@example.com,Teeth & nails,68.00
+2025-07-12,Moss Kowalczyk,moss.kowalczyk@example.com,Full groom,85.00
+2025-07-12,Tansy Obradovic,tansy.obradovic@example.com,De-shed treatment,114.00
+2025-07-12,Tansy Xiong,tansy.xiong@example.com,De-shed treatment,49.00
+2025-07-12,Wendell Umali,wendell.umali@example.com,Nail trim,93.00
+2025-07-12,Ximena Delgado,ximena.delgado@example.com,Full groom + de-shed,117.00
+2025-07-13,Arlo Ibarra,arlo.ibarra@example.com,Puppy intro groom,107.00
+2025-07-13,Bennett Kowalczyk,bennett.kowalczyk@example.com,Nail trim,77.00
+2025-07-13,Hana Jernigan,hana.jernigan@example.com,Puppy intro groom,108.00
+2025-07-13,Jonas Edelman,jonas.edelman@example.com,Bath & brush,71.00
+2025-07-14,Quentin Goodall,quentin.goodall@example.com,Full groom,74.00
+2025-07-15,Hana Drummond,hana.drummond@example.com,Full groom,115.00
+2025-07-15,Marisol Quintana,marisol.q@example.com,Full groom,87.00
+2025-07-15,Nell Birkeland,nell.birkeland@example.com,Full groom,61.00
+2025-07-15,Quentin Umali,quentin.umali@example.com,Nail trim,73.00
+2025-07-15,Silas Cuthbert,silas.cuthbert@example.com,Teeth & nails,59.00
+2025-07-15,Umberto Obradovic,umberto.obradovic@example.com,Puppy intro groom,102.00
+2025-07-15,Yusuf Delgado,yusuf.delgado@example.com,Bath & brush,58.00
+2025-07-15,Yusuf Mercado,yusuf.mercado@example.com,Teeth & nails,77.00
+2025-07-16,Bennett Eastman,bennett.eastman@example.com,Full groom,112.00
+2025-07-16,Ximena Xiong,ximena.xiong@example.com,Full groom + de-shed,71.00
+2025-07-17,Elif Birkeland,elif.birkeland@example.com,Full groom,101.00
+2025-07-17,Pilar Cuthbert,pilar.cuthbert@example.com,Puppy intro groom,66.00
+2025-07-18,Aiyana Delgado,aiyana.delgado@example.com,Teeth & nails,96.00
+2025-07-18,Bennett Goodall,bennett.goodall@example.com,Teeth & nails,94.00
+2025-07-18,Emory Cuthbert,emory.cuthbert@example.com,De-shed treatment,73.00
+2025-07-18,Hana Thackeray,hana.thackeray@example.com,Puppy intro groom,55.00
+2025-07-18,Lela Lindqvist,lela.lindqvist@example.com,Puppy intro groom,67.00
+2025-07-18,Nell Eastman,nell.eastman@example.com,Full groom,90.00
+2025-07-19,Caleb Fairweather,caleb.fairweather@example.com,Full groom,66.00
+2025-07-19,Gus Umali,gus.umali@example.com,Teeth & nails,117.00
+2025-07-19,Tansy Kowalczyk,tansy.kowalczyk@example.com,Puppy intro groom,56.00
+2025-07-20,Fern Delgado,fern.delgado@example.com,Nail trim,95.00
+2025-07-20,Lorena Ainsley,lorena.ainsley@example.com,De-shed treatment,70.00
+2025-07-20,Wendell Northcutt,wendell.northcutt@example.com,Bath & brush,51.00
+2025-07-21,Caleb Rasmussen,caleb.rasmussen@example.com,Full groom,61.00
+2025-07-21,Gideon Bostwick,gideon.bostwick@example.com,Full groom,85.00
+2025-07-21,Lorena Birkeland,lorena.birkeland@example.com,Teeth & nails,72.00
+2025-07-22,Umberto Ainsley,umberto.ainsley@example.com,Puppy intro groom,58.00
+2025-07-23,Ida Vanterpool,ida.vanterpool@example.com,Nail trim,113.00
+2025-07-23,Kit Zeller,kit.zeller@example.com,De-shed treatment,68.00
+2025-07-23,Rosa Northcutt,rosa.northcutt@example.com,De-shed treatment,77.00
+2025-07-24,Aiyana Umali,aiyana.umali@example.com,Full groom,90.00
+2025-07-24,Imogen Xiong,imogen.xiong@example.com,Nail trim,84.00
+2025-07-24,Quentin Cuthbert,quentin.cuthbert@example.com,Nail trim,69.00
+2025-07-24,Wendell Yarborough,wendell.yarborough@example.com,Puppy intro groom,57.00
+2025-07-25,Nia Ainsley,nia.ainsley@example.com,Puppy intro groom,72.00
+2025-07-25,Oscar Birkeland,oscar.birkeland@example.com,Puppy intro groom,63.00
+2025-07-25,Pilar Ainsley,pilar.ainsley@example.com,De-shed treatment,84.00
+2025-07-25,Quentin Bostwick,quentin.bostwick@example.com,Full groom,117.00
+2025-07-26,Bess Thackeray,bess.thackeray@example.com,Teeth & nails,48.00
+2025-07-26,Lorena Xiong,lorena.xiong@example.com,Full groom,91.00
+2025-07-26,Matteo Ibarra,matteo.ibarra@example.com,De-shed treatment,55.00
+2025-07-26,Nell Drummond,nell.drummond@example.com,De-shed treatment,108.00
+2025-07-26,Nell Umali,nell.umali@example.com,Full groom,99.00
+2025-07-27,Bess Jernigan,bess.jernigan@example.com,Full groom + de-shed,61.00
+2025-07-27,Pilar Northcutt,pilar.northcutt@example.com,Teeth & nails,82.00
+2025-07-27,Tansy Bostwick,tansy.bostwick@example.com,De-shed treatment,52.00
+2025-07-28,Cora Whitlock,cora.whitlock@example.com,Teeth & nails,92.00
+2025-07-28,Nia Vanterpool,nia.vanterpool@example.com,Full groom,66.00
+2025-07-29,Elif Zeller,elif.zeller@example.com,Puppy intro groom,85.00
+2025-07-29,Gideon Northcutt,gideon.northcutt@example.com,Nail trim,70.00
+2025-07-29,Hana Ainsley,hana.ainsley@example.com,Bath & brush,93.00
+2025-07-29,Umberto Quill,umberto.quill@example.com,Teeth & nails,52.00
+2025-07-30,Cora Vanterpool,cora.vanterpool@example.com,Nail trim,87.00
+2025-07-30,Hollis Jernigan,hollis.jernigan@example.com,Full groom + de-shed,106.00
+2025-07-30,Nia Xiong,nia.xiong@example.com,De-shed treatment,70.00
+2025-07-31,Arlo Delgado,arlo.delgado@example.com,Bath & brush,106.00
+2025-07-31,Odette Calloway,odette.calloway@example.com,Nail trim,104.00
+2025-07-31,Silas Delgado,silas.delgado@example.com,Full groom + de-shed,75.00
+2025-07-31,Wendell Umali,wendell.umali@example.com,Teeth & nails,79.00
+2025-08-02,Gus Sandoval,gus.sandoval@example.com,Puppy intro groom,79.00
+2025-08-02,Hollis Quill,hollis.quill@example.com,Puppy intro groom,97.00
+2025-08-02,Jasper Zeller,jasper.zeller@example.com,Bath & brush,74.00
+2025-08-02,Quentin Thackeray,quentin.thackeray@example.com,Puppy intro groom,54.00
+2025-08-03,Nell Birkeland,nell.birkeland@example.com,Teeth & nails,53.00
+2025-08-03,Nia Mercado,nia.mercado@example.com,Bath & brush,118.00
+2025-08-03,Tansy Birkeland,tansy.birkeland@example.com,Bath & brush,96.00
+2025-08-03,Wendell Cuthbert,wendell.cuthbert@example.com,Puppy intro groom,63.00
+2025-08-04,Lela Birkeland,lela.birkeland@example.com,Full groom,115.00
+2025-08-04,Lorena Pemberton,lorena.pemberton@example.com,Full groom + de-shed,48.00
+2025-08-04,Nell Zeller,nell.zeller@example.com,Bath & brush,115.00
+2025-08-04,Theo Branagh,theo.branagh@example.com,Nail trim,105.00
+2025-08-05,Arlo Quill,arlo.quill@example.com,Full groom,86.00
+2025-08-05,Caleb Drummond,caleb.drummond@example.com,Bath & brush,99.00
+2025-08-05,Elif Lindqvist,elif.lindqvist@example.com,Full groom + de-shed,103.00
+2025-08-05,Kit Obradovic,kit.obradovic@example.com,Nail trim,58.00
+2025-08-05,Moss Sandoval,moss.sandoval@example.com,Bath & brush,89.00
+2025-08-05,Ximena Xiong,ximena.xiong@example.com,Teeth & nails,57.00
+2025-08-06,Arlo Cuthbert,arlo.cuthbert@example.com,De-shed treatment,115.00
+2025-08-06,Cora Pemberton,cora.pemberton@example.com,De-shed treatment,93.00
+2025-08-06,Desmond Delgado,desmond.delgado@example.com,De-shed treatment,102.00
+2025-08-06,Pilar Thackeray,pilar.thackeray@example.com,Teeth & nails,94.00
+2025-08-06,Wendell Calloway,wendell.calloway@example.com,Full groom,78.00
+2025-08-07,Greta Faulkner,greta.faulkner@example.com,Teeth & nails,63.00
+2025-08-07,Moss Kowalczyk,moss.kowalczyk@example.com,Full groom + de-shed,72.00
+2025-08-07,Silas Xiong,silas.xiong@example.com,Bath & brush,87.00
+2025-08-07,Yusuf Birkeland,yusuf.birkeland@example.com,Puppy intro groom,77.00
+2025-08-08,Caleb Fairweather,caleb.fairweather@example.com,De-shed treatment,62.00
+2025-08-08,Hana Jernigan,hana.jernigan@example.com,Puppy intro groom,118.00
+2025-08-08,Kenji Cuthbert,kenji.cuthbert@example.com,Nail trim,54.00
+2025-08-08,Mika Sorensen,mika.sorensen@example.com,Bath & brush,66.00
+2025-08-08,Ximena Delgado,ximena.delgado@example.com,Teeth & nails,105.00
+2025-08-08,Ximena Vanterpool,ximena.vanterpool@example.com,Bath & brush,53.00
+2025-08-11,Bennett Goodall,bennett.goodall@example.com,De-shed treatment,94.00
+2025-08-11,Quentin Goodall,quentin.goodall@example.com,Nail trim,72.00
+2025-08-11,Tansy Northcutt,tansy.northcutt@example.com,Puppy intro groom,78.00
+2025-08-11,Tansy Obradovic,tansy.obradovic@example.com,Full groom + de-shed,114.00
+2025-08-11,Umberto Calloway,umberto.calloway@example.com,Bath & brush,87.00
+2025-08-11,Yusuf Fairweather,yusuf.fairweather@example.com,Full groom,83.00
+2025-08-12,Lela Fairweather,lela.fairweather@example.com,Bath & brush,99.00
+2025-08-12,Lela Zeller,lela.zeller@example.com,Teeth & nails,77.00
+2025-08-12,Marisol Quintana,marisol.q@example.com,Bath & brush,85.00
+2025-08-12,Tansy Fairweather,tansy.fairweather@example.com,Teeth & nails,75.00
+2025-08-13,Gideon Bostwick,gideon.bostwick@example.com,Puppy intro groom,80.00
+2025-08-13,Lorena Birkeland,lorena.birkeland@example.com,De-shed treatment,62.00
+2025-08-13,Pilar Cuthbert,pilar.cuthbert@example.com,Bath & brush,65.00
+2025-08-14,Aiyana Delgado,aiyana.delgado@example.com,Nail trim,91.00
+2025-08-14,Bennett Eastman,bennett.eastman@example.com,Nail trim,105.00
+2025-08-14,Fern Xiong,fern.xiong@example.com,De-shed treatment,61.00
+2025-08-14,Hana Drummond,hana.drummond@example.com,De-shed treatment,109.00
+2025-08-14,Hollis Obradovic,hollis.obradovic@example.com,Full groom + de-shed,50.00
+2025-08-14,Nell Umali,nell.umali@example.com,Full groom + de-shed,100.00
+2025-08-14,Pilar Ainsley,pilar.ainsley@example.com,Teeth & nails,78.00
+2025-08-14,Silas Cuthbert,silas.cuthbert@example.com,Full groom + de-shed,62.00
+2025-08-14,Umberto Obradovic,umberto.obradovic@example.com,Bath & brush,101.00
+2025-08-16,Hollis Ainsley,hollis.ainsley@example.com,Nail trim,75.00
+2025-08-16,Pilar Northcutt,pilar.northcutt@example.com,De-shed treatment,84.00
+2025-08-16,Tansy Kowalczyk,tansy.kowalczyk@example.com,De-shed treatment,57.00
+2025-08-17,Caleb Rasmussen,caleb.rasmussen@example.com,Full groom + de-shed,63.00
+2025-08-17,Nia Vanterpool,nia.vanterpool@example.com,De-shed treatment,71.00
+2025-08-17,Quentin Umali,quentin.umali@example.com,Teeth & nails,71.00
+2025-08-17,Umberto Drummond,umberto.drummond@example.com,Nail trim,60.00
+2025-08-17,Yusuf Mercado,yusuf.mercado@example.com,Nail trim,71.00
+2025-08-18,Arlo Ibarra,arlo.ibarra@example.com,De-shed treatment,111.00
+2025-08-18,Bess Jernigan,bess.jernigan@example.com,Full groom + de-shed,69.00
+2025-08-18,Elif Zeller,elif.zeller@example.com,Puppy intro groom,73.00
+2025-08-18,Gus Umali,gus.umali@example.com,Nail trim,118.00
+2025-08-19,Quentin Cuthbert,quentin.cuthbert@example.com,Full groom + de-shed,62.00
+2025-08-19,Tansy Bostwick,tansy.bostwick@example.com,Full groom,57.00
+2025-08-20,Lela Lindqvist,lela.lindqvist@example.com,Teeth & nails,63.00
+2025-08-20,Nell Eastman,nell.eastman@example.com,Puppy intro groom,81.00
+2025-08-20,Quentin Bostwick,quentin.bostwick@example.com,Nail trim,107.00
+2025-08-21,Imogen Xiong,imogen.xiong@example.com,Puppy intro groom,78.00
+2025-08-21,Rosa Northcutt,rosa.northcutt@example.com,Full groom,79.00
+2025-08-21,Wendell Umali,wendell.umali@example.com,Nail trim,83.00
+2025-08-22,Bess Thackeray,bess.thackeray@example.com,Bath & brush,49.00
+2025-08-22,Lorena Xiong,lorena.xiong@example.com,Full groom,78.00
+2025-08-22,Nell Birkeland,nell.birkeland@example.com,Nail trim,59.00
+2025-08-22,Rosa Lindqvist,rosa.lindqvist@example.com,De-shed treatment,48.00
+2025-08-23,Aiyana Fairweather,aiyana.fairweather@example.com,Bath & brush,85.00
+2025-08-23,Emory Cuthbert,emory.cuthbert@example.com,Puppy intro groom,82.00
+2025-08-23,Gus Whitlock,gus.whitlock@example.com,Bath & brush,72.00
+2025-08-23,Jonas Edelman,jonas.edelman@example.com,Teeth & nails,74.00
+2025-08-24,Hana Thackeray,hana.thackeray@example.com,Nail trim,50.00
+2025-08-24,Kit Zeller,kit.zeller@example.com,De-shed treatment,77.00
+2025-08-25,Hana Ainsley,hana.ainsley@example.com,Bath & brush,77.00
+2025-08-25,Nell Northcutt,nell.northcutt@example.com,De-shed treatment,120.00
+2025-08-26,Nia Xiong,nia.xiong@example.com,Puppy intro groom,65.00
+2025-08-26,Ximena Xiong,ximena.xiong@example.com,Bath & brush,64.00
+2025-08-27,Arlo Vanterpool,arlo.vanterpool@example.com,Puppy intro groom,66.00
+2025-08-27,Matteo Obradovic,matteo.obradovic@example.com,Bath & brush,99.00
+2025-08-27,Nell Thackeray,nell.thackeray@example.com,Nail trim,61.00
+2025-08-27,Odette Calloway,odette.calloway@example.com,Puppy intro groom,109.00
+2025-08-27,Tansy Birkeland,tansy.birkeland@example.com,Bath & brush,96.00
+2025-08-29,Pilar Umali,pilar.umali@example.com,De-shed treatment,91.00
+2025-08-29,Silas Pemberton,silas.pemberton@example.com,Bath & brush,95.00
+2025-08-29,Wendell Cuthbert,wendell.cuthbert@example.com,Bath & brush,63.00
+2025-08-30,Caleb Fairweather,caleb.fairweather@example.com,De-shed treatment,63.00
+2025-08-30,Cora Umali,cora.umali@example.com,Full groom,62.00
+2025-08-30,Gus Mercado,gus.mercado@example.com,Full groom,84.00
+2025-08-30,Ida Vanterpool,ida.vanterpool@example.com,Full groom + de-shed,104.00
+2025-08-30,Yusuf Delgado,yusuf.delgado@example.com,Full groom,59.00
+2025-08-31,Cora Vanterpool,cora.vanterpool@example.com,Bath & brush,78.00
+2025-08-31,Gideon Northcutt,gideon.northcutt@example.com,Bath & brush,73.00
+2025-08-31,Nia Ainsley,nia.ainsley@example.com,Nail trim,66.00
+2025-08-31,Umberto Quill,umberto.quill@example.com,Full groom + de-shed,59.00
+2025-09-01,Arlo Quill,arlo.quill@example.com,Teeth & nails,92.00
+2025-09-01,Caleb Drummond,caleb.drummond@example.com,Teeth & nails,89.00
+2025-09-01,Gus Sandoval,gus.sandoval@example.com,Teeth & nails,75.00
+2025-09-01,Hollis Jernigan,hollis.jernigan@example.com,De-shed treatment,104.00
+2025-09-01,Oscar Birkeland,oscar.birkeland@example.com,Full groom,78.00
+2025-09-02,Imogen Bostwick,imogen.bostwick@example.com,Full groom,77.00
+2025-09-02,Moss Kowalczyk,moss.kowalczyk@example.com,De-shed treatment,73.00
+2025-09-02,Moss Sandoval,moss.sandoval@example.com,De-shed treatment,93.00
+2025-09-02,Nell Drummond,nell.drummond@example.com,Teeth & nails,105.00
+2025-09-02,Pilar Ainsley,pilar.ainsley@example.com,Puppy intro groom,91.00
+2025-09-03,Elif Birkeland,elif.birkeland@example.com,Bath & brush,98.00
+2025-09-03,Hana Jernigan,hana.jernigan@example.com,Full groom + de-shed,114.00
+2025-09-03,Lela Birkeland,lela.birkeland@example.com,Full groom + de-shed,103.00
+2025-09-03,Nell Zeller,nell.zeller@example.com,Teeth & nails,109.00
+2025-09-04,Nell Umali,nell.umali@example.com,Full groom + de-shed,95.00
+2025-09-04,Quentin Thackeray,quentin.thackeray@example.com,Full groom + de-shed,53.00
+2025-09-05,Pilar Cuthbert,pilar.cuthbert@example.com,Full groom,76.00
+2025-09-05,Ximena Delgado,ximena.delgado@example.com,De-shed treatment,114.00
+2025-09-06,Arlo Cuthbert,arlo.cuthbert@example.com,Full groom + de-shed,109.00
+2025-09-06,Bennett Kowalczyk,bennett.kowalczyk@example.com,Full groom + de-shed,74.00
+2025-09-06,Elif Zeller,elif.zeller@example.com,Nail trim,80.00
+2025-09-06,Gideon Bostwick,gideon.bostwick@example.com,Teeth & nails,80.00
+2025-09-06,Greta Faulkner,greta.faulkner@example.com,Full groom + de-shed,70.00
+2025-09-06,Kit Obradovic,kit.obradovic@example.com,Full groom,61.00
+2025-09-06,Mika Sorensen,mika.sorensen@example.com,Bath & brush,70.00
+2025-09-06,Quentin Goodall,quentin.goodall@example.com,Teeth & nails,76.00
+2025-09-06,Umberto Ainsley,umberto.ainsley@example.com,Bath & brush,59.00
+2025-09-07,Bennett Goodall,bennett.goodall@example.com,Teeth & nails,91.00
+2025-09-07,Bess Jernigan,bess.jernigan@example.com,Full groom,63.00
+2025-09-07,Lorena Birkeland,lorena.birkeland@example.com,De-shed treatment,68.00
+2025-09-07,Pilar Northcutt,pilar.northcutt@example.com,Full groom + de-shed,79.00
+2025-09-08,Quentin Fairweather,quentin.fairweather@example.com,Teeth & nails,60.00
+2025-09-08,Wendell Calloway,wendell.calloway@example.com,De-shed treatment,66.00
+2025-09-09,Aiyana Delgado,aiyana.delgado@example.com,De-shed treatment,101.00
+2025-09-09,Bennett Eastman,bennett.eastman@example.com,Nail trim,115.00
+2025-09-09,Cora Whitlock,cora.whitlock@example.com,Puppy intro groom,91.00
+2025-09-09,Marisol Quintana,marisol.q@example.com,Full groom,89.00
+2025-09-09,Nia Vanterpool,nia.vanterpool@example.com,Nail trim,70.00
+2025-09-09,Theo Branagh,theo.branagh@example.com,Full groom + de-shed,92.00
+2025-09-10,Elif Lindqvist,elif.lindqvist@example.com,Bath & brush,100.00
+2025-09-10,Tansy Xiong,tansy.xiong@example.com,Nail trim,63.00
+2025-09-11,Caleb Rasmussen,caleb.rasmussen@example.com,Full groom,47.00
+2025-09-11,Lorena Pemberton,lorena.pemberton@example.com,Teeth & nails,49.00
+2025-09-11,Tansy Bostwick,tansy.bostwick@example.com,Bath & brush,54.00
+2025-09-11,Wendell Northcutt,wendell.northcutt@example.com,Teeth & nails,53.00
+2025-09-12,Hana Drummond,hana.drummond@example.com,Full groom + de-shed,102.00
+2025-09-13,Nia Mercado,nia.mercado@example.com,De-shed treatment,117.00
+2025-09-13,Quentin Umali,quentin.umali@example.com,Puppy intro groom,68.00
+2025-09-13,Silas Cuthbert,silas.cuthbert@example.com,Nail trim,47.00
+2025-09-13,Tansy Obradovic,tansy.obradovic@example.com,Full groom,108.00
+2025-09-13,Wendell Umali,wendell.umali@example.com,Nail trim,90.00
+2025-09-13,Wendell Yarborough,wendell.yarborough@example.com,Nail trim,61.00
+2025-09-14,Lorena Xiong,lorena.xiong@example.com,De-shed treatment,91.00
+2025-09-14,Nell Birkeland,nell.birkeland@example.com,Puppy intro groom,53.00
+2025-09-14,Ximena Xiong,ximena.xiong@example.com,De-shed treatment,64.00
+2025-09-15,Fern Xiong,fern.xiong@example.com,Bath & brush,47.00
+2025-09-15,Umberto Obradovic,umberto.obradovic@example.com,Full groom + de-shed,102.00
+2025-09-16,Quentin Bostwick,quentin.bostwick@example.com,Teeth & nails,109.00
+2025-09-16,Yusuf Mercado,yusuf.mercado@example.com,Nail trim,67.00
+2025-09-17,Cora Pemberton,cora.pemberton@example.com,De-shed treatment,93.00
+2025-09-17,Gus Umali,gus.umali@example.com,Teeth & nails,107.00
+2025-09-17,Imogen Xiong,imogen.xiong@example.com,Full groom + de-shed,82.00
+2025-09-17,Lela Fairweather,lela.fairweather@example.com,Full groom,103.00
+2025-09-17,Quentin Cuthbert,quentin.cuthbert@example.com,Full groom + de-shed,70.00
+2025-09-17,Rosa Northcutt,rosa.northcutt@example.com,Full groom,92.00
+2025-09-17,Tansy Kowalczyk,tansy.kowalczyk@example.com,Full groom,53.00
+2025-09-19,Bess Thackeray,bess.thackeray@example.com,Bath & brush,56.00
+2025-09-20,Arlo Ibarra,arlo.ibarra@example.com,Puppy intro groom,114.00
+2025-09-20,Emory Yarborough,emory.yarborough@example.com,Bath & brush,85.00
+2025-09-21,Caleb Fairweather,caleb.fairweather@example.com,Teeth & nails,64.00
+2025-09-21,Lela Lindqvist,lela.lindqvist@example.com,Nail trim,69.00
+2025-09-21,Nell Eastman,nell.eastman@example.com,Nail trim,78.00
+2025-09-22,Tansy Birkeland,tansy.birkeland@example.com,De-shed treatment,92.00
+2025-09-22,Wendell Cuthbert,wendell.cuthbert@example.com,Teeth & nails,62.00
+2025-09-23,Matteo Ibarra,matteo.ibarra@example.com,De-shed treatment,48.00
+2025-09-23,Nell Umali,nell.umali@example.com,Puppy intro groom,99.00
+2025-09-23,Pilar Ainsley,pilar.ainsley@example.com,Teeth & nails,78.00
+2025-09-23,Ximena Vanterpool,ximena.vanterpool@example.com,Teeth & nails,58.00
+2025-09-24,Emory Cuthbert,emory.cuthbert@example.com,Bath & brush,85.00
+2025-09-24,Hana Ainsley,hana.ainsley@example.com,Teeth & nails,88.00
+2025-09-24,Hollis Quill,hollis.quill@example.com,Bath & brush,99.00
+2025-09-24,Nia Xiong,nia.xiong@example.com,Bath & brush,67.00
+2025-09-24,Odette Calloway,odette.calloway@example.com,Puppy intro groom,111.00
+2025-09-25,Hollis Ainsley,hollis.ainsley@example.com,Full groom,78.00
+2025-09-25,Kit Zeller,kit.zeller@example.com,Teeth & nails,62.00
+2025-09-26,Elif Zeller,elif.zeller@example.com,Full groom + de-shed,82.00
+2025-09-26,Hana Jernigan,hana.jernigan@example.com,Puppy intro groom,102.00
+2025-09-26,Lela Zeller,lela.zeller@example.com,Teeth & nails,68.00
+2025-09-27,Bess Jernigan,bess.jernigan@example.com,Bath & brush,68.00
+2025-09-27,Gideon Northcutt,gideon.northcutt@example.com,De-shed treatment,68.00
+2025-09-27,Pilar Northcutt,pilar.northcutt@example.com,De-shed treatment,90.00
+2025-09-27,Yusuf Birkeland,yusuf.birkeland@example.com,Teeth & nails,90.00
+2025-09-27,Yusuf Fairweather,yusuf.fairweather@example.com,Teeth & nails,86.00
+2025-09-28,Desmond Delgado,desmond.delgado@example.com,Nail trim,96.00
+2025-09-28,Pilar Thackeray,pilar.thackeray@example.com,Bath & brush,87.00
+2025-09-28,Umberto Drummond,umberto.drummond@example.com,Nail trim,62.00
+2025-09-29,Arlo Quill,arlo.quill@example.com,Full groom,83.00
+2025-09-29,Gideon Bostwick,gideon.bostwick@example.com,Nail trim,77.00
+2025-09-29,Kenji Cuthbert,kenji.cuthbert@example.com,Nail trim,62.00
+2025-09-29,Moss Kowalczyk,moss.kowalczyk@example.com,Full groom + de-shed,82.00
+2025-09-29,Moss Sandoval,moss.sandoval@example.com,Teeth & nails,88.00
+2025-09-30,Hana Thackeray,hana.thackeray@example.com,Nail trim,56.00
+2025-09-30,Jasper Zeller,jasper.zeller@example.com,Full groom + de-shed,84.00
+2025-09-30,Jonas Edelman,jonas.edelman@example.com,Teeth & nails,73.00
+2025-09-30,Pilar Cuthbert,pilar.cuthbert@example.com,Puppy intro groom,65.00
+2025-10-01,Lela Birkeland,lela.birkeland@example.com,Full groom,118.00
+2025-10-01,Nia Vanterpool,nia.vanterpool@example.com,Bath & brush,57.00
+2025-10-01,Silas Xiong,silas.xiong@example.com,Full groom,87.00
+2025-10-02,Nell Zeller,nell.zeller@example.com,De-shed treatment,112.00
+2025-10-02,Ximena Delgado,ximena.delgado@example.com,Nail trim,104.00
+2025-10-03,Arlo Cuthbert,arlo.cuthbert@example.com,Full groom + de-shed,116.00
+2025-10-03,Bennett Goodall,bennett.goodall@example.com,Full groom,91.00
+2025-10-03,Cora Vanterpool,cora.vanterpool@example.com,Teeth & nails,84.00
+2025-10-03,Gus Sandoval,gus.sandoval@example.com,Teeth & nails,78.00
+2025-10-03,Hollis Jernigan,hollis.jernigan@example.com,Puppy intro groom,113.00
+2025-10-03,Ida Vanterpool,ida.vanterpool@example.com,De-shed treatment,110.00
+2025-10-03,Lorena Birkeland,lorena.birkeland@example.com,Puppy intro groom,60.00
+2025-10-03,Quentin Goodall,quentin.goodall@example.com,Bath & brush,73.00
+2025-10-03,Tansy Bostwick,tansy.bostwick@example.com,Full groom + de-shed,53.00
+2025-10-03,Umberto Quill,umberto.quill@example.com,Full groom + de-shed,47.00
+2025-10-04,Caleb Drummond,caleb.drummond@example.com,Nail trim,93.00
+2025-10-04,Nell Birkeland,nell.birkeland@example.com,Nail trim,51.00
+2025-10-04,Quentin Thackeray,quentin.thackeray@example.com,Nail trim,51.00
+2025-10-04,Ximena Xiong,ximena.xiong@example.com,Full groom,62.00
+2025-10-05,Nia Ainsley,nia.ainsley@example.com,De-shed treatment,65.00
+2025-10-05,Wendell Umali,wendell.umali@example.com,Full groom,86.00
+2025-10-06,Caleb Rasmussen,caleb.rasmussen@example.com,Nail trim,47.00
+2025-10-06,Gus Whitlock,gus.whitlock@example.com,Nail trim,74.00
+2025-10-06,Marisol Quintana,marisol.q@example.com,Bath & brush,83.00
+2025-10-07,Aiyana Delgado,aiyana.delgado@example.com,Nail trim,95.00
+2025-10-07,Bennett Eastman,bennett.eastman@example.com,Teeth & nails,111.00
+2025-10-07,Greta Faulkner,greta.faulkner@example.com,Puppy intro groom,65.00
+2025-10-07,Kit Obradovic,kit.obradovic@example.com,De-shed treatment,50.00
+2025-10-08,Lorena Xiong,lorena.xiong@example.com,Puppy intro groom,82.00
+2025-10-09,Hana Drummond,hana.drummond@example.com,Bath & brush,111.00
+2025-10-09,Umberto Calloway,umberto.calloway@example.com,De-shed treatment,82.00
+2025-10-10,Arlo Vanterpool,arlo.vanterpool@example.com,Puppy intro groom,69.00
+2025-10-10,Oscar Birkeland,oscar.birkeland@example.com,Nail trim,70.00
+2025-10-10,Tansy Northcutt,tansy.northcutt@example.com,Bath & brush,75.00
+2025-10-11,Aiyana Fairweather,aiyana.fairweather@example.com,Bath & brush,77.00
+2025-10-12,Mika Sorensen,mika.sorensen@example.com,Bath & brush,70.00
+2025-10-12,Quentin Umali,quentin.umali@example.com,Teeth & nails,78.00
+2025-10-12,Theo Branagh,theo.branagh@example.com,Nail trim,85.00
+2025-10-13,Caleb Fairweather,caleb.fairweather@example.com,Nail trim,69.00
+2025-10-13,Nell Umali,nell.umali@example.com,Puppy intro groom,88.00
+2025-10-13,Pilar Ainsley,pilar.ainsley@example.com,Bath & brush,78.00
+2025-10-13,Pilar Umali,pilar.umali@example.com,Full groom,87.00
+2025-10-13,Quentin Cuthbert,quentin.cuthbert@example.com,Full groom,67.00
+2025-10-13,Silas Cuthbert,silas.cuthbert@example.com,Bath & brush,53.00
+2025-10-14,Gus Umali,gus.umali@example.com,Nail trim,117.00
+2025-10-14,Imogen Xiong,imogen.xiong@example.com,Bath & brush,80.00
+2025-10-14,Tansy Kowalczyk,tansy.kowalczyk@example.com,Teeth & nails,59.00
+2025-10-15,Bess Thackeray,bess.thackeray@example.com,Bath & brush,58.00
+2025-10-15,Elif Lindqvist,elif.lindqvist@example.com,Full groom + de-shed,98.00
+2025-10-15,Elif Zeller,elif.zeller@example.com,Nail trim,79.00
+2025-10-15,Tansy Obradovic,tansy.obradovic@example.com,Puppy intro groom,116.00
+2025-10-16,Quentin Bostwick,quentin.bostwick@example.com,Full groom + de-shed,109.00
+2025-10-16,Tansy Birkeland,tansy.birkeland@example.com,Full groom,89.00
+2025-10-16,Wendell Calloway,wendell.calloway@example.com,Full groom + de-shed,65.00
+2025-10-16,Wendell Cuthbert,wendell.cuthbert@example.com,Bath & brush,59.00
+2025-10-17,Fern Xiong,fern.xiong@example.com,Nail trim,58.00
+2025-10-17,Pilar Northcutt,pilar.northcutt@example.com,Bath & brush,80.00
+2025-10-17,Rosa Northcutt,rosa.northcutt@example.com,Full groom,92.00
+2025-10-17,Umberto Obradovic,umberto.obradovic@example.com,Puppy intro groom,100.00
+2025-10-17,Yusuf Mercado,yusuf.mercado@example.com,De-shed treatment,64.00
+2025-10-18,Elif Birkeland,elif.birkeland@example.com,Nail trim,91.00
+2025-10-18,Nell Drummond,nell.drummond@example.com,Full groom,110.00
+2025-10-18,Nell Thackeray,nell.thackeray@example.com,Puppy intro groom,56.00
+2025-10-19,Lela Fairweather,lela.fairweather@example.com,Full groom + de-shed,100.00
+2025-10-19,Matteo Obradovic,matteo.obradovic@example.com,Puppy intro groom,100.00
+2025-10-20,Bess Jernigan,bess.jernigan@example.com,Full groom + de-shed,57.00
+2025-10-20,Cora Umali,cora.umali@example.com,Puppy intro groom,68.00
+2025-10-20,Cora Whitlock,cora.whitlock@example.com,Bath & brush,91.00
+2025-10-20,Imogen Bostwick,imogen.bostwick@example.com,Full groom + de-shed,82.00
+2025-10-20,Nell Eastman,nell.eastman@example.com,Teeth & nails,87.00
+2025-10-21,Hana Jernigan,hana.jernigan@example.com,Bath & brush,112.00
+2025-10-21,Lorena Pemberton,lorena.pemberton@example.com,Full groom + de-shed,59.00
+2025-10-21,Nia Xiong,nia.xiong@example.com,Full groom,59.00
+2025-10-21,Yusuf Delgado,yusuf.delgado@example.com,Full groom,63.00
+2025-10-22,Umberto Ainsley,umberto.ainsley@example.com,Bath & brush,59.00
+2025-10-23,Hana Ainsley,hana.ainsley@example.com,Puppy intro groom,79.00
+2025-10-23,Moss Kowalczyk,moss.kowalczyk@example.com,Full groom,80.00
+2025-10-23,Nell Birkeland,nell.birkeland@example.com,De-shed treatment,48.00
+2025-10-23,Nia Vanterpool,nia.vanterpool@example.com,Bath & brush,57.00
+2025-10-23,Odette Calloway,odette.calloway@example.com,Puppy intro groom,102.00
+2025-10-24,Arlo Ibarra,arlo.ibarra@example.com,De-shed treatment,103.00
+2025-10-24,Gideon Bostwick,gideon.bostwick@example.com,Nail trim,84.00
+2025-10-24,Wendell Umali,wendell.umali@example.com,De-shed treatment,82.00
+2025-10-25,Arlo Quill,arlo.quill@example.com,Full groom,85.00
+2025-10-25,Evelyn Hartree,evelyn.hartree@example.com,Full groom + de-shed,160.00
+2025-10-25,Ximena Xiong,ximena.xiong@example.com,Full groom,59.00
+2025-10-26,Cora Pemberton,cora.pemberton@example.com,Teeth & nails,78.00
+2025-10-26,Gideon Northcutt,gideon.northcutt@example.com,Nail trim,58.00
+2025-10-26,Lorena Birkeland,lorena.birkeland@example.com,Puppy intro groom,71.00
+2025-10-26,Moss Sandoval,moss.sandoval@example.com,Puppy intro groom,81.00
+2025-10-26,Pilar Cuthbert,pilar.cuthbert@example.com,Full groom,65.00
+2025-10-26,Tansy Bostwick,tansy.bostwick@example.com,De-shed treatment,62.00
+2025-10-27,Lela Birkeland,lela.birkeland@example.com,Full groom + de-shed,109.00
+2025-10-27,Lela Lindqvist,lela.lindqvist@example.com,Teeth & nails,57.00
+2025-10-27,Nia Mercado,nia.mercado@example.com,Bath & brush,116.00
+2025-10-28,Bennett Goodall,bennett.goodall@example.com,Puppy intro groom,100.00
+2025-10-28,Gus Mercado,gus.mercado@example.com,Teeth & nails,83.00
+2025-10-30,Emory Cuthbert,emory.cuthbert@example.com,Full groom + de-shed,85.00
+2025-10-30,Gus Sandoval,gus.sandoval@example.com,Full groom,80.00
+2025-10-31,Kit Zeller,kit.zeller@example.com,Bath & brush,68.00
+2025-10-31,Quentin Goodall,quentin.goodall@example.com,Full groom,76.00
+2025-11-01,Caleb Drummond,caleb.drummond@example.com,Nail trim,103.00
+2025-11-01,Lorena Xiong,lorena.xiong@example.com,De-shed treatment,84.00
+2025-11-01,Nell Zeller,nell.zeller@example.com,Bath & brush,116.00
+2025-11-01,Ximena Delgado,ximena.delgado@example.com,Teeth & nails,118.00
+2025-11-02,Arlo Cuthbert,arlo.cuthbert@example.com,Bath & brush,112.00
+2025-11-02,Caleb Rasmussen,caleb.rasmussen@example.com,De-shed treatment,53.00
+2025-11-02,Hollis Jernigan,hollis.jernigan@example.com,Teeth & nails,106.00
+2025-11-02,Umberto Quill,umberto.quill@example.com,Puppy intro groom,54.00
+2025-11-02,Wendell Yarborough,wendell.yarborough@example.com,Full groom,68.00
+2025-11-03,Aiyana Delgado,aiyana.delgado@example.com,Full groom,93.00
+2025-11-04,Caleb Fairweather,caleb.fairweather@example.com,Nail trim,64.00
+2025-11-04,Elif Zeller,elif.zeller@example.com,Nail trim,76.00
+2025-11-04,Marisol Quintana,marisol.q@example.com,Full groom,77.00
+2025-11-05,Bennett Eastman,bennett.eastman@example.com,Teeth & nails,102.00
+2025-11-05,Bennett Kowalczyk,bennett.kowalczyk@example.com,De-shed treatment,72.00
+2025-11-05,Greta Faulkner,greta.faulkner@example.com,Teeth & nails,68.00
+2025-11-05,Hana Thackeray,hana.thackeray@example.com,Nail trim,59.00
+2025-11-05,Kit Obradovic,kit.obradovic@example.com,Bath & brush,55.00
+2025-11-05,Nell Umali,nell.umali@example.com,Bath & brush,98.00
+2025-11-05,Pilar Ainsley,pilar.ainsley@example.com,Bath & brush,86.00
+2025-11-05,Quentin Thackeray,quentin.thackeray@example.com,Teeth & nails,63.00
+2025-11-05,Wendell Northcutt,wendell.northcutt@example.com,Bath & brush,60.00
+2025-11-06,Jonas Edelman,jonas.edelman@example.com,De-shed treatment,69.00
+2025-11-07,Umberto Drummond,umberto.drummond@example.com,De-shed treatment,68.00
+2025-11-08,Hana Drummond,hana.drummond@example.com,Teeth & nails,117.00
+2025-11-08,Hollis Ainsley,hollis.ainsley@example.com,Teeth & nails,73.00
+2025-11-08,Ida Vanterpool,ida.vanterpool@example.com,Full groom + de-shed,106.00
+2025-11-08,Pilar Northcutt,pilar.northcutt@example.com,Puppy intro groom,85.00
+2025-11-09,Cora Vanterpool,cora.vanterpool@example.com,Bath & brush,80.00
+2025-11-09,Quentin Cuthbert,quentin.cuthbert@example.com,Full groom + de-shed,66.00
+2025-11-09,Tansy Birkeland,tansy.birkeland@example.com,Full groom + de-shed,91.00
+2025-11-09,Tansy Xiong,tansy.xiong@example.com,De-shed treatment,53.00
+2025-11-09,Wendell Cuthbert,wendell.cuthbert@example.com,Nail trim,65.00
+2025-11-10,Lela Zeller,lela.zeller@example.com,Teeth & nails,77.00
+2025-11-10,Quentin Umali,quentin.umali@example.com,Bath & brush,73.00
+2025-11-11,Bess Jernigan,bess.jernigan@example.com,Bath & brush,68.00
+2025-11-11,Bess Thackeray,bess.thackeray@example.com,Bath & brush,49.00
+2025-11-11,Tansy Kowalczyk,tansy.kowalczyk@example.com,De-shed treatment,60.00
+2025-11-12,Imogen Xiong,imogen.xiong@example.com,Nail trim,72.00
+2025-11-12,Nia Ainsley,nia.ainsley@example.com,Full groom,71.00
+2025-11-12,Silas Cuthbert,silas.cuthbert@example.com,Puppy intro groom,62.00
+2025-11-13,Gus Umali,gus.umali@example.com,Nail trim,116.00
+2025-11-13,Gus Whitlock,gus.whitlock@example.com,De-shed treatment,73.00
+2025-11-13,Hana Jernigan,hana.jernigan@example.com,De-shed treatment,104.00
+2025-11-13,Quentin Bostwick,quentin.bostwick@example.com,Bath & brush,110.00
+2025-11-14,Nell Birkeland,nell.birkeland@example.com,Nail trim,63.00
+2025-11-14,Rosa Northcutt,rosa.northcutt@example.com,Teeth & nails,93.00
+2025-11-14,Ximena Vanterpool,ximena.vanterpool@example.com,Full groom,49.00
+2025-11-14,Yusuf Fairweather,yusuf.fairweather@example.com,Bath & brush,79.00
+2025-11-15,Kenji Cuthbert,kenji.cuthbert@example.com,De-shed treatment,56.00
+2025-11-15,Nia Vanterpool,nia.vanterpool@example.com,Bath & brush,67.00
+2025-11-15,Theo Branagh,theo.branagh@example.com,Teeth & nails,95.00
+2025-11-15,Umberto Obradovic,umberto.obradovic@example.com,Full groom + de-shed,99.00
+2025-11-15,Wendell Umali,wendell.umali@example.com,Full groom,87.00
+2025-11-15,Yusuf Mercado,yusuf.mercado@example.com,Teeth & nails,76.00
+2025-11-16,Desmond Delgado,desmond.delgado@example.com,Full groom + de-shed,98.00
+2025-11-16,Elif Lindqvist,elif.lindqvist@example.com,Teeth & nails,98.00
+2025-11-17,Arlo Vanterpool,arlo.vanterpool@example.com,Puppy intro groom,64.00
+2025-11-17,Gideon Bostwick,gideon.bostwick@example.com,Full groom + de-shed,83.00
+2025-11-17,Mika Sorensen,mika.sorensen@example.com,Bath & brush,74.00
+2025-11-17,Moss Kowalczyk,moss.kowalczyk@example.com,Teeth & nails,82.00
+2025-11-17,Nell Eastman,nell.eastman@example.com,De-shed treatment,83.00
+2025-11-17,Tansy Obradovic,tansy.obradovic@example.com,Puppy intro groom,108.00
+2025-11-17,Ximena Xiong,ximena.xiong@example.com,Nail trim,62.00
+2025-11-18,Odette Calloway,odette.calloway@example.com,Puppy intro groom,101.00
+2025-11-18,Tansy Bostwick,tansy.bostwick@example.com,Full groom + de-shed,61.00
+2025-11-19,Hana Ainsley,hana.ainsley@example.com,Nail trim,80.00
+2025-11-19,Matteo Ibarra,matteo.ibarra@example.com,Bath & brush,54.00
+2025-11-19,Pilar Thackeray,pilar.thackeray@example.com,Full groom,97.00
+2025-11-20,Nia Xiong,nia.xiong@example.com,Bath & brush,72.00
+2025-11-20,Oscar Birkeland,oscar.birkeland@example.com,Full groom,62.00
+2025-11-20,Yusuf Birkeland,yusuf.birkeland@example.com,Puppy intro groom,81.00
+2025-11-21,Lorena Birkeland,lorena.birkeland@example.com,Puppy intro groom,59.00
+2025-11-21,Pilar Cuthbert,pilar.cuthbert@example.com,Puppy intro groom,73.00
+2025-11-21,Wendell Calloway,wendell.calloway@example.com,Nail trim,76.00
+2025-11-22,Moss Sandoval,moss.sandoval@example.com,Bath & brush,92.00
+2025-11-23,Bennett Goodall,bennett.goodall@example.com,Bath & brush,102.00
+2025-11-24,Arlo Quill,arlo.quill@example.com,Full groom + de-shed,88.00
+2025-11-24,Elif Zeller,elif.zeller@example.com,Teeth & nails,74.00
+2025-11-24,Fern Xiong,fern.xiong@example.com,De-shed treatment,53.00
+2025-11-24,Hollis Quill,hollis.quill@example.com,Full groom,89.00
+2025-11-24,Lela Birkeland,lela.birkeland@example.com,De-shed treatment,116.00
+2025-11-24,Lela Fairweather,lela.fairweather@example.com,Teeth & nails,95.00
+2025-11-25,Caleb Rasmussen,caleb.rasmussen@example.com,Full groom,47.00
+2025-11-25,Gideon Northcutt,gideon.northcutt@example.com,Bath & brush,73.00
+2025-11-25,Nell Umali,nell.umali@example.com,Full groom + de-shed,102.00
+2025-11-26,Caleb Fairweather,caleb.fairweather@example.com,Full groom + de-shed,64.00
+2025-11-26,Lorena Xiong,lorena.xiong@example.com,Nail trim,93.00
+2025-11-27,Aiyana Fairweather,aiyana.fairweather@example.com,Bath & brush,89.00
+2025-11-27,Arlo Ibarra,arlo.ibarra@example.com,Full groom,103.00
+2025-11-27,Nell Zeller,nell.zeller@example.com,Full groom + de-shed,108.00
+2025-11-27,Pilar Ainsley,pilar.ainsley@example.com,Nail trim,80.00
+2025-11-27,Quentin Goodall,quentin.goodall@example.com,Puppy intro groom,70.00
+2025-11-28,Jasper Zeller,jasper.zeller@example.com,De-shed treatment,85.00
+2025-11-29,Arlo Cuthbert,arlo.cuthbert@example.com,Bath & brush,109.00
+2025-11-29,Lorena Pemberton,lorena.pemberton@example.com,Full groom,63.00
+2025-11-29,Umberto Calloway,umberto.calloway@example.com,Nail trim,88.00
+2025-11-29,Ximena Delgado,ximena.delgado@example.com,Teeth & nails,114.00
+2025-11-30,Rosa Lindqvist,rosa.lindqvist@example.com,Nail trim,60.00
+2025-11-30,Umberto Quill,umberto.quill@example.com,Bath & brush,56.00
+2025-12-01,Gus Sandoval,gus.sandoval@example.com,Nail trim,75.00
+2025-12-01,Pilar Northcutt,pilar.northcutt@example.com,Teeth & nails,84.00
+2025-12-01,Silas Xiong,silas.xiong@example.com,Full groom + de-shed,102.00
+2025-12-02,Cora Whitlock,cora.whitlock@example.com,De-shed treatment,82.00
+2025-12-02,Kit Zeller,kit.zeller@example.com,Puppy intro groom,70.00
+2025-12-02,Marisol Quintana,marisol.q@example.com,Bath & brush,84.00
+2025-12-02,Pilar Umali,pilar.umali@example.com,Puppy intro groom,85.00
+2025-12-02,Tansy Birkeland,tansy.birkeland@example.com,Teeth & nails,102.00
+2025-12-03,Aiyana Delgado,aiyana.delgado@example.com,Nail trim,94.00
+2025-12-03,Bennett Eastman,bennett.eastman@example.com,Nail trim,102.00
+2025-12-03,Caleb Drummond,caleb.drummond@example.com,Teeth & nails,99.00
+2025-12-03,Greta Faulkner,greta.faulkner@example.com,Puppy intro groom,63.00
+2025-12-03,Nell Drummond,nell.drummond@example.com,Bath & brush,115.00
+2025-12-04,Bess Jernigan,bess.jernigan@example.com,Teeth & nails,67.00
+2025-12-04,Emory Cuthbert,emory.cuthbert@example.com,Puppy intro groom,85.00
+2025-12-04,Hana Drummond,hana.drummond@example.com,Full groom,118.00
+2025-12-04,Lela Lindqvist,lela.lindqvist@example.com,Full groom,73.00
+2025-12-04,Nell Birkeland,nell.birkeland@example.com,De-shed treatment,51.00
+2025-12-04,Quentin Thackeray,quentin.thackeray@example.com,Bath & brush,55.00
+2025-12-04,Wendell Cuthbert,wendell.cuthbert@example.com,Full groom,62.00
+2025-12-05,Hollis Jernigan,hollis.jernigan@example.com,Bath & brush,114.00
+2025-12-05,Kit Obradovic,kit.obradovic@example.com,Bath & brush,47.00
+2025-12-06,Wendell Umali,wendell.umali@example.com,De-shed treatment,80.00
+2025-12-07,Nia Vanterpool,nia.vanterpool@example.com,Teeth & nails,59.00
+2025-12-07,Quentin Umali,quentin.umali@example.com,Teeth & nails,75.00
+2025-12-08,Cora Pemberton,cora.pemberton@example.com,De-shed treatment,81.00
+2025-12-08,Quentin Cuthbert,quentin.cuthbert@example.com,Teeth & nails,63.00
+2025-12-08,Tansy Northcutt,tansy.northcutt@example.com,Puppy intro groom,63.00
+2025-12-08,Ximena Xiong,ximena.xiong@example.com,Nail trim,64.00
+2025-12-09,Imogen Bostwick,imogen.bostwick@example.com,Nail trim,86.00
+2025-12-09,Imogen Xiong,imogen.xiong@example.com,Full groom,77.00
+2025-12-09,Nia Mercado,nia.mercado@example.com,Bath & brush,107.00
+2025-12-09,Umberto Ainsley,umberto.ainsley@example.com,Bath & brush,50.00
+2025-12-10,Elif Birkeland,elif.birkeland@example.com,Teeth & nails,91.00
+2025-12-10,Gideon Bostwick,gideon.bostwick@example.com,Full groom + de-shed,74.00
+2025-12-10,Hana Jernigan,hana.jernigan@example.com,Nail trim,105.00
+2025-12-10,Nell Thackeray,nell.thackeray@example.com,Puppy intro groom,50.00
+2025-12-11,Bess Thackeray,bess.thackeray@example.com,De-shed treatment,60.00
+2025-12-11,Hana Thackeray,hana.thackeray@example.com,Nail trim,61.00
+2025-12-11,Ida Vanterpool,ida.vanterpool@example.com,Puppy intro groom,108.00
+2025-12-11,Quentin Bostwick,quentin.bostwick@example.com,Puppy intro groom,106.00
+2025-12-11,Tansy Bostwick,tansy.bostwick@example.com,Bath & brush,61.00
+2025-12-11,Yusuf Delgado,yusuf.delgado@example.com,Full groom,61.00
+2025-12-12,Gus Umali,gus.umali@example.com,Puppy intro groom,102.00
+2025-12-12,Silas Cuthbert,silas.cuthbert@example.com,Puppy intro groom,58.00
+2025-12-12,Tansy Kowalczyk,tansy.kowalczyk@example.com,De-shed treatment,51.00
+2025-12-13,Elif Zeller,elif.zeller@example.com,Nail trim,84.00
+2025-12-13,Moss Birkeland,moss.birkeland@example.com,Nail trim,75.00
+2025-12-13,Moss Kowalczyk,moss.kowalczyk@example.com,Teeth & nails,87.00
+2025-12-14,Matteo Obradovic,matteo.obradovic@example.com,Full groom + de-shed,93.00
+2025-12-14,Nell Eastman,nell.eastman@example.com,Nail trim,90.00
+2025-12-14,Nia Ainsley,nia.ainsley@example.com,Puppy intro groom,65.00
+2025-12-14,Pilar Cuthbert,pilar.cuthbert@example.com,Bath & brush,69.00
+2025-12-15,Caleb Fairweather,caleb.fairweather@example.com,Full groom + de-shed,68.00
+2025-12-15,Umberto Obradovic,umberto.obradovic@example.com,Full groom + de-shed,103.00
+2025-12-16,Cora Umali,cora.umali@example.com,Full groom,59.00
+2025-12-16,Cora Vanterpool,cora.vanterpool@example.com,Puppy intro groom,72.00
+2025-12-16,Hana Ainsley,hana.ainsley@example.com,Full groom + de-shed,85.00
+2025-12-16,Lorena Birkeland,lorena.birkeland@example.com,Nail trim,57.00
+2025-12-16,Mika Sorensen,mika.sorensen@example.com,Bath & brush,75.00
+2025-12-16,Rosa Northcutt,rosa.northcutt@example.com,Full groom + de-shed,86.00
+2025-12-16,Umberto Drummond,umberto.drummond@example.com,Nail trim,66.00
+2025-12-17,Jonas Edelman,jonas.edelman@example.com,Puppy intro groom,73.00
+2025-12-17,Nell Umali,nell.umali@example.com,Nail trim,100.00
+2025-12-17,Nia Xiong,nia.xiong@example.com,Full groom + de-shed,71.00
+2025-12-17,Odette Calloway,odette.calloway@example.com,Teeth & nails,103.00
+2025-12-17,Pilar Ainsley,pilar.ainsley@example.com,Puppy intro groom,85.00
+2025-12-18,Gus Mercado,gus.mercado@example.com,Bath & brush,86.00
+2025-12-18,Tansy Obradovic,tansy.obradovic@example.com,Bath & brush,104.00
+2025-12-18,Yusuf Mercado,yusuf.mercado@example.com,Full groom + de-shed,77.00
+2025-12-19,Wendell Yarborough,wendell.yarborough@example.com,De-shed treatment,73.00
+2025-12-20,Bennett Goodall,bennett.goodall@example.com,De-shed treatment,103.00
+2025-12-21,Arlo Quill,arlo.quill@example.com,De-shed treatment,85.00
+2025-12-21,Caleb Rasmussen,caleb.rasmussen@example.com,Teeth & nails,52.00
+2025-12-21,Moss Sandoval,moss.sandoval@example.com,De-shed treatment,93.00
+2025-12-22,Theo Branagh,theo.branagh@example.com,Bath & brush,99.00
+2025-12-23,Lela Birkeland,lela.birkeland@example.com,Puppy intro groom,103.00
+2025-12-23,Lorena Xiong,lorena.xiong@example.com,Teeth & nails,91.00
+2025-12-24,Bess Jernigan,bess.jernigan@example.com,Full groom,69.00
+2025-12-24,Elif Lindqvist,elif.lindqvist@example.com,De-shed treatment,98.00
+2025-12-24,Nell Zeller,nell.zeller@example.com,Full groom,118.00
+2025-12-24,Pilar Northcutt,pilar.northcutt@example.com,De-shed treatment,83.00
+2025-12-25,Gus Whitlock,gus.whitlock@example.com,Nail trim,65.00
+2025-12-25,Ximena Delgado,ximena.delgado@example.com,Puppy intro groom,106.00
+2025-12-26,Bennett Kowalczyk,bennett.kowalczyk@example.com,Full groom + de-shed,72.00
+2025-12-26,Lela Fairweather,lela.fairweather@example.com,Full groom,96.00
+2025-12-26,Lela Zeller,lela.zeller@example.com,De-shed treatment,78.00
+2025-12-26,Nell Birkeland,nell.birkeland@example.com,Full groom,55.00
+2025-12-26,Nia Vanterpool,nia.vanterpool@example.com,Bath & brush,62.00
+2025-12-26,Tansy Birkeland,tansy.birkeland@example.com,De-shed treatment,92.00
+2025-12-27,Gideon Northcutt,gideon.northcutt@example.com,Bath & brush,57.00
+2025-12-27,Quentin Goodall,quentin.goodall@example.com,Full groom + de-shed,78.00
+2025-12-27,Wendell Umali,wendell.umali@example.com,Bath & brush,78.00
+2025-12-28,Arlo Cuthbert,arlo.cuthbert@example.com,De-shed treatment,111.00
+2025-12-28,Fern Xiong,fern.xiong@example.com,Nail trim,50.00
+2025-12-28,Ximena Xiong,ximena.xiong@example.com,Puppy intro groom,66.00
+2025-12-29,Aiyana Delgado,aiyana.delgado@example.com,Full groom,92.00
+2025-12-29,Bennett Eastman,bennett.eastman@example.com,Nail trim,105.00
+2025-12-29,Wendell Calloway,wendell.calloway@example.com,Nail trim,65.00
+2025-12-29,Wendell Northcutt,wendell.northcutt@example.com,Full groom + de-shed,52.00
+2025-12-30,Arlo Ibarra,arlo.ibarra@example.com,De-shed treatment,111.00
+2025-12-30,Caleb Drummond,caleb.drummond@example.com,De-shed treatment,102.00
+2025-12-30,Marisol Quintana,marisol.q@example.com,Full groom,84.00
+2025-12-30,Tansy Bostwick,tansy.bostwick@example.com,Nail trim,63.00
+2025-12-30,Umberto Quill,umberto.quill@example.com,Bath & brush,58.00
+2025-12-30,Wendell Cuthbert,wendell.cuthbert@example.com,Nail trim,73.00
+2025-12-31,Hana Drummond,hana.drummond@example.com,Full groom,103.00
+2026-01-01,Hollis Jernigan,hollis.jernigan@example.com,Teeth & nails,112.00
+2026-01-01,Kit Obradovic,kit.obradovic@example.com,Puppy intro groom,50.00
+2026-01-02,Arlo Vanterpool,arlo.vanterpool@example.com,Nail trim,62.00
+2026-01-02,Hollis Ainsley,hollis.ainsley@example.com,Nail trim,67.00
+2026-01-02,Oscar Birkeland,oscar.birkeland@example.com,Nail trim,76.00
+2026-01-02,Ximena Vanterpool,ximena.vanterpool@example.com,Bath & brush,58.00
+2026-01-02,Yusuf Fairweather,yusuf.fairweather@example.com,De-shed treatment,78.00
+2026-01-03,Gideon Bostwick,gideon.bostwick@example.com,Bath & brush,81.00
+2026-01-03,Greta Faulkner,greta.faulkner@example.com,Bath & brush,60.00
+2026-01-03,Gus Sandoval,gus.sandoval@example.com,Full groom,82.00
+2026-01-04,Caleb Fairweather,caleb.fairweather@example.com,Bath & brush,73.00
+2026-01-04,Quentin Cuthbert,quentin.cuthbert@example.com,Full groom + de-shed,69.00
+2026-01-05,Elif Zeller,elif.zeller@example.com,Bath & brush,85.00
+2026-01-05,Hana Jernigan,hana.jernigan@example.com,Bath & brush,110.00
+2026-01-06,Quentin Thackeray,quentin.thackeray@example.com,Bath & brush,62.00
+2026-01-07,Desmond Delgado,desmond.delgado@example.com,Puppy intro groom,95.00
+2026-01-07,Kenji Cuthbert,kenji.cuthbert@example.com,De-shed treatment,51.00
+2026-01-07,Quentin Bostwick,quentin.bostwick@example.com,De-shed treatment,112.00
+2026-01-07,Tansy Xiong,tansy.xiong@example.com,Full groom,48.00
+2026-01-08,Bess Thackeray,bess.thackeray@example.com,Bath & brush,54.00
+2026-01-08,Lela Lindqvist,lela.lindqvist@example.com,Teeth & nails,69.00
+2026-01-08,Moss Kowalczyk,moss.kowalczyk@example.com,Teeth & nails,83.00
+2026-01-08,Nell Umali,nell.umali@example.com,De-shed treatment,87.00
+2026-01-08,Pilar Ainsley,pilar.ainsley@example.com,Bath & brush,91.00
+2026-01-08,Pilar Cuthbert,pilar.cuthbert@example.com,Full groom + de-shed,75.00
+2026-01-09,Emory Cuthbert,emory.cuthbert@example.com,De-shed treatment,78.00
+2026-01-09,Imogen Xiong,imogen.xiong@example.com,Bath & brush,73.00
+2026-01-09,Kit Zeller,kit.zeller@example.com,Puppy intro groom,76.00
+2026-01-09,Lorena Birkeland,lorena.birkeland@example.com,Puppy intro groom,69.00
+2026-01-09,Matteo Ibarra,matteo.ibarra@example.com,De-shed treatment,56.00
+2026-01-09,Quentin Umali,quentin.umali@example.com,Full groom,65.00
+2026-01-10,Cora Whitlock,cora.whitlock@example.com,De-shed treatment,93.00
+2026-01-11,Aiyana Fairweather,aiyana.fairweather@example.com,Full groom + de-shed,92.00
+2026-01-11,Gus Umali,gus.umali@example.com,Nail trim,105.00
+2026-01-11,Pilar Thackeray,pilar.thackeray@example.com,Puppy intro groom,96.00
+2026-01-12,Lorena Pemberton,lorena.pemberton@example.com,Nail trim,62.00
+2026-01-12,Pilar Northcutt,pilar.northcutt@example.com,Full groom,83.00
+2026-01-12,Rosa Northcutt,rosa.northcutt@example.com,Teeth & nails,81.00
+2026-01-12,Tansy Kowalczyk,tansy.kowalczyk@example.com,Teeth & nails,62.00
+2026-01-13,Nell Drummond,nell.drummond@example.com,Full groom,102.00
+2026-01-13,Odette Calloway,odette.calloway@example.com,Bath & brush,100.00
+2026-01-13,Umberto Obradovic,umberto.obradovic@example.com,Nail trim,93.00
+2026-01-13,Vera Northcutt,vera.northcutt@example.com,De-shed treatment,120.00
+2026-01-14,Bess Jernigan,bess.jernigan@example.com,Full groom + de-shed,67.00
+2026-01-14,Hana Ainsley,hana.ainsley@example.com,Teeth & nails,86.00
+2026-01-14,Hollis Quill,hollis.quill@example.com,Puppy intro groom,89.00
+2026-01-14,Nia Xiong,nia.xiong@example.com,Puppy intro groom,60.00
+2026-01-14,Silas Cuthbert,silas.cuthbert@example.com,De-shed treatment,50.00
+2026-01-15,Bennett Goodall,bennett.goodall@example.com,Teeth & nails,89.00
+2026-01-15,Caleb Rasmussen,caleb.rasmussen@example.com,Teeth & nails,63.00
+2026-01-15,Wendell Umali,wendell.umali@example.com,Teeth & nails,91.00
+2026-01-16,Lorena Xiong,lorena.xiong@example.com,De-shed treatment,92.00
+2026-01-16,Nell Eastman,nell.eastman@example.com,Full groom,83.00
+2026-01-16,Tansy Obradovic,tansy.obradovic@example.com,De-shed treatment,118.00
+2026-01-17,Hana Thackeray,hana.thackeray@example.com,De-shed treatment,47.00
+2026-01-17,Mika Sorensen,mika.sorensen@example.com,Bath & brush,66.00
+2026-01-17,Nell Birkeland,nell.birkeland@example.com,Teeth & nails,52.00
+2026-01-17,Nia Ainsley,nia.ainsley@example.com,Nail trim,67.00
+2026-01-17,Nia Vanterpool,nia.vanterpool@example.com,De-shed treatment,67.00
+2026-01-17,Yusuf Birkeland,yusuf.birkeland@example.com,Full groom,84.00
+2026-01-18,Ida Vanterpool,ida.vanterpool@example.com,Bath & brush,114.00
+2026-01-18,Lela Birkeland,lela.birkeland@example.com,De-shed treatment,117.00
+2026-01-18,Ximena Xiong,ximena.xiong@example.com,Bath & brush,69.00
+2026-01-18,Yusuf Mercado,yusuf.mercado@example.com,Full groom + de-shed,65.00
+2026-01-19,Cora Pemberton,cora.pemberton@example.com,Puppy intro groom,80.00
+2026-01-19,Imogen Whitlock,imogen.whitlock@example.com,Nail trim,95.00
+2026-01-19,Moss Sandoval,moss.sandoval@example.com,De-shed treatment,85.00
+2026-01-19,Nia Mercado,nia.mercado@example.com,Nail trim,116.00
+2026-01-19,Pilar Umali,pilar.umali@example.com,Puppy intro groom,87.00
+2026-01-19,Tansy Birkeland,tansy.birkeland@example.com,Teeth & nails,103.00
+2026-01-20,Arlo Quill,arlo.quill@example.com,De-shed treatment,86.00
+2026-01-20,Tansy Bostwick,tansy.bostwick@example.com,Nail trim,57.00
+2026-01-20,Ximena Delgado,ximena.delgado@example.com,Bath & brush,108.00
+2026-01-21,Cora Vanterpool,cora.vanterpool@example.com,Puppy intro groom,83.00
+2026-01-21,Umberto Calloway,umberto.calloway@example.com,De-shed treatment,84.00
+2026-01-23,Nell Zeller,nell.zeller@example.com,Full groom + de-shed,104.00
+2026-01-23,Umberto Drummond,umberto.drummond@example.com,Full groom,60.00
+2026-01-23,Wendell Cuthbert,wendell.cuthbert@example.com,Teeth & nails,67.00
+2026-01-24,Caleb Fairweather,caleb.fairweather@example.com,Puppy intro groom,68.00
+2026-01-24,Elif Birkeland,elif.birkeland@example.com,Full groom,97.00
+2026-01-24,Elif Zeller,elif.zeller@example.com,Teeth & nails,87.00
+2026-01-24,Jonas Edelman,jonas.edelman@example.com,Bath & brush,80.00
+2026-01-24,Quentin Goodall,quentin.goodall@example.com,Bath & brush,64.00
+2026-01-24,Silas Xiong,silas.xiong@example.com,Bath & brush,95.00
+2026-01-26,Aiyana Delgado,aiyana.delgado@example.com,Teeth & nails,103.00
+2026-01-26,Hana Drummond,hana.drummond@example.com,Teeth & nails,116.00
+2026-01-27,Bennett Eastman,bennett.eastman@example.com,Nail trim,118.00
+2026-01-27,Marisol Quintana,marisol.q@example.com,Bath & brush,85.00
+2026-01-27,Nell Umali,nell.umali@example.com,De-shed treatment,94.00
+2026-01-27,Umberto Ainsley,umberto.ainsley@example.com,Full groom + de-shed,58.00
+2026-01-27,Umberto Quill,umberto.quill@example.com,Full groom,47.00
+2026-01-28,Gideon Bostwick,gideon.bostwick@example.com,Puppy intro groom,84.00
+2026-01-28,Hollis Jernigan,hollis.jernigan@example.com,De-shed treatment,107.00
+2026-01-28,Jasper Zeller,jasper.zeller@example.com,Puppy intro groom,77.00
+2026-01-28,Theo Branagh,theo.branagh@example.com,Full groom + de-shed,105.00
+2026-01-29,Arlo Cuthbert,arlo.cuthbert@example.com,Puppy intro groom,110.00
+2026-01-29,Gideon Northcutt,gideon.northcutt@example.com,Full groom,60.00
+2026-01-29,Pilar Ainsley,pilar.ainsley@example.com,Full groom,79.00
+2026-01-30,Elif Lindqvist,elif.lindqvist@example.com,Nail trim,93.00
+2026-01-30,Gus Sandoval,gus.sandoval@example.com,Puppy intro groom,81.00
+2026-01-30,Kit Obradovic,kit.obradovic@example.com,Nail trim,63.00
+2026-01-30,Nell Thackeray,nell.thackeray@example.com,De-shed treatment,54.00
+2026-01-31,Imogen Bostwick,imogen.bostwick@example.com,Teeth & nails,77.00
+2026-02-01,Caleb Drummond,caleb.drummond@example.com,Bath & brush,89.00
+2026-02-01,Hana Jernigan,hana.jernigan@example.com,Full groom + de-shed,105.00
+2026-02-01,Lela Fairweather,lela.fairweather@example.com,Teeth & nails,102.00
+2026-02-01,Pilar Cuthbert,pilar.cuthbert@example.com,Puppy intro groom,74.00
+2026-02-01,Quentin Cuthbert,quentin.cuthbert@example.com,Full groom + de-shed,66.00
+2026-02-02,Lela Zeller,lela.zeller@example.com,Teeth & nails,75.00
+2026-02-02,Moss Kowalczyk,moss.kowalczyk@example.com,Bath & brush,88.00
+2026-02-02,Yusuf Delgado,yusuf.delgado@example.com,Full groom,53.00
+2026-02-03,Fern Xiong,fern.xiong@example.com,Teeth & nails,56.00
+2026-02-03,Gus Whitlock,gus.whitlock@example.com,Nail trim,73.00
+2026-02-03,Pilar Northcutt,pilar.northcutt@example.com,Bath & brush,80.00
+2026-02-04,Bess Jernigan,bess.jernigan@example.com,Full groom,73.00
+2026-02-04,Bess Thackeray,bess.thackeray@example.com,Full groom,59.00
+2026-02-04,Greta Faulkner,greta.faulkner@example.com,Teeth & nails,65.00
+2026-02-04,Lorena Birkeland,lorena.birkeland@example.com,Nail trim,68.00
+2026-02-04,Quentin Thackeray,quentin.thackeray@example.com,Teeth & nails,55.00
+2026-02-04,Tansy Northcutt,tansy.northcutt@example.com,Puppy intro groom,74.00
+2026-02-04,Wendell Umali,wendell.umali@example.com,Puppy intro groom,93.00
+2026-02-05,Quentin Bostwick,quentin.bostwick@example.com,Bath & brush,103.00
+2026-02-05,Wendell Calloway,wendell.calloway@example.com,Puppy intro groom,72.00
+2026-02-06,Arlo Ibarra,arlo.ibarra@example.com,Bath & brush,102.00
+2026-02-07,Caleb Rasmussen,caleb.rasmussen@example.com,Bath & brush,49.00
+2026-02-07,Imogen Xiong,imogen.xiong@example.com,Full groom,78.00
+2026-02-07,Wendell Yarborough,wendell.yarborough@example.com,Full groom + de-shed,67.00
+2026-02-08,Cora Umali,cora.umali@example.com,Puppy intro groom,58.00
+2026-02-08,Gus Mercado,gus.mercado@example.com,Puppy intro groom,79.00
+2026-02-08,Nell Birkeland,nell.birkeland@example.com,Full groom,59.00
+2026-02-08,Tansy Kowalczyk,tansy.kowalczyk@example.com,Bath & brush,55.00
+2026-02-09,Lorena Xiong,lorena.xiong@example.com,Teeth & nails,79.00
+2026-02-09,Nia Vanterpool,nia.vanterpool@example.com,Nail trim,62.00
+2026-02-09,Nia Xiong,nia.xiong@example.com,Nail trim,66.00
+2026-02-09,Odette Calloway,odette.calloway@example.com,Full groom + de-shed,106.00
+2026-02-09,Quentin Umali,quentin.umali@example.com,Teeth & nails,70.00
+2026-02-09,Ximena Xiong,ximena.xiong@example.com,Puppy intro groom,69.00
+2026-02-10,Gus Umali,gus.umali@example.com,Bath & brush,107.00
+2026-02-11,Arlo Vanterpool,arlo.vanterpool@example.com,Puppy intro groom,78.00
+2026-02-11,Bennett Goodall,bennett.goodall@example.com,De-shed treatment,99.00
+2026-02-11,Oscar Birkeland,oscar.birkeland@example.com,Nail trim,69.00
+2026-02-11,Silas Cuthbert,silas.cuthbert@example.com,Teeth & nails,58.00
+2026-02-12,Kit Zeller,kit.zeller@example.com,De-shed treatment,63.00
+2026-02-12,Tansy Bostwick,tansy.bostwick@example.com,Teeth & nails,58.00
+2026-02-12,Umberto Obradovic,umberto.obradovic@example.com,Puppy intro groom,102.00
+2026-02-13,Matteo Obradovic,matteo.obradovic@example.com,Teeth & nails,95.00
+2026-02-14,Rosa Northcutt,rosa.northcutt@example.com,Nail trim,77.00
+2026-02-14,Tansy Birkeland,tansy.birkeland@example.com,Full groom,102.00
+2026-02-14,Yusuf Mercado,yusuf.mercado@example.com,Teeth & nails,74.00
+2026-02-15,Caleb Fairweather,caleb.fairweather@example.com,Full groom + de-shed,62.00
+2026-02-15,Emory Cuthbert,emory.cuthbert@example.com,Full groom,76.00
+2026-02-15,Lela Birkeland,lela.birkeland@example.com,Bath & brush,111.00
+2026-02-15,Lela Lindqvist,lela.lindqvist@example.com,Full groom + de-shed,68.00
+2026-02-15,Moss Sandoval,moss.sandoval@example.com,Bath & brush,82.00
+2026-02-15,Nell Eastman,nell.eastman@example.com,Puppy intro groom,79.00
+2026-02-15,Wendell Cuthbert,wendell.cuthbert@example.com,Nail trim,68.00
+2026-02-16,Elif Zeller,elif.zeller@example.com,Puppy intro groom,86.00
+2026-02-16,Hana Ainsley,hana.ainsley@example.com,Full groom + de-shed,88.00
+2026-02-17,Tansy Obradovic,tansy.obradovic@example.com,Bath & brush,105.00
+2026-02-17,Ximena Delgado,ximena.delgado@example.com,Teeth & nails,110.00
+2026-02-18,Arlo Quill,arlo.quill@example.com,Full groom,92.00
+2026-02-18,Nell Umali,nell.umali@example.com,Nail trim,96.00
+2026-02-18,Nell Zeller,nell.zeller@example.com,De-shed treatment,103.00
+2026-02-20,Lorena Pemberton,lorena.pemberton@example.com,Full groom + de-shed,50.00
+2026-02-20,Nell Drummond,nell.drummond@example.com,Full groom,116.00
+2026-02-21,Aiyana Delgado,aiyana.delgado@example.com,De-shed treatment,91.00
+2026-02-21,Hana Thackeray,hana.thackeray@example.com,Teeth & nails,60.00
+2026-02-21,Ida Vanterpool,ida.vanterpool@example.com,Full groom,115.00
+2026-02-21,Pilar Ainsley,pilar.ainsley@example.com,Teeth & nails,92.00
+2026-02-21,Quentin Goodall,quentin.goodall@example.com,Nail trim,65.00
+2026-02-22,Hana Drummond,hana.drummond@example.com,De-shed treatment,113.00
+2026-02-22,Kenji Cuthbert,kenji.cuthbert@example.com,Nail trim,62.00
+2026-02-22,Mika Sorensen,mika.sorensen@example.com,Bath & brush,67.00
+2026-02-22,Yusuf Fairweather,yusuf.fairweather@example.com,Full groom + de-shed,81.00
+2026-02-23,Bennett Kowalczyk,bennett.kowalczyk@example.com,De-shed treatment,73.00
+2026-02-23,Desmond Delgado,desmond.delgado@example.com,Nail trim,92.00
+2026-02-23,Gideon Bostwick,gideon.bostwick@example.com,De-shed treatment,72.00
+2026-02-23,Marisol Quintana,marisol.q@example.com,Full groom,91.00
+2026-02-23,Ximena Vanterpool,ximena.vanterpool@example.com,Teeth & nails,48.00
+2026-02-24,Bennett Eastman,bennett.eastman@example.com,Full groom,103.00
+2026-02-24,Hana Jernigan,hana.jernigan@example.com,Full groom,102.00
+2026-02-24,Nia Ainsley,nia.ainsley@example.com,Full groom + de-shed,64.00
+2026-02-24,Umberto Quill,umberto.quill@example.com,Bath & brush,63.00
+2026-02-25,Cora Vanterpool,cora.vanterpool@example.com,Full groom + de-shed,76.00
+2026-02-25,Hollis Jernigan,hollis.jernigan@example.com,Full groom + de-shed,110.00
+2026-02-25,Pilar Cuthbert,pilar.cuthbert@example.com,De-shed treatment,78.00
+2026-02-25,Pilar Northcutt,pilar.northcutt@example.com,Full groom + de-shed,84.00
+2026-02-26,Bess Jernigan,bess.jernigan@example.com,Nail trim,60.00
+2026-02-26,Wendell Umali,wendell.umali@example.com,Teeth & nails,88.00
+2026-02-27,Moss Kowalczyk,moss.kowalczyk@example.com,Full groom + de-shed,77.00
+2026-02-27,Wendell Northcutt,wendell.northcutt@example.com,Puppy intro groom,53.00
+2026-02-28,Caleb Drummond,caleb.drummond@example.com,Teeth & nails,92.00
+2026-02-28,Kit Obradovic,kit.obradovic@example.com,Puppy intro groom,47.00
+2026-03-01,Arlo Cuthbert,arlo.cuthbert@example.com,Bath & brush,117.00
+2026-03-01,Gideon Northcutt,gideon.northcutt@example.com,De-shed treatment,73.00
+2026-03-01,Nell Birkeland,nell.birkeland@example.com,Full groom,57.00
+2026-03-01,Ximena Xiong,ximena.xiong@example.com,De-shed treatment,67.00
+2026-03-02,Gus Sandoval,gus.sandoval@example.com,Teeth & nails,82.00
+2026-03-02,Lorena Birkeland,lorena.birkeland@example.com,Puppy intro groom,73.00
+2026-03-02,Nia Mercado,nia.mercado@example.com,Bath & brush,108.00
+2026-03-02,Nia Vanterpool,nia.vanterpool@example.com,Nail trim,73.00
+2026-03-02,Pilar Thackeray,pilar.thackeray@example.com,Full groom + de-shed,101.00
+2026-03-02,Quentin Cuthbert,quentin.cuthbert@example.com,Nail trim,67.00
+2026-03-03,Cora Pemberton,cora.pemberton@example.com,Teeth & nails,77.00
+2026-03-03,Cora Whitlock,cora.whitlock@example.com,Puppy intro groom,82.00
+2026-03-03,Tansy Bostwick,tansy.bostwick@example.com,Teeth & nails,53.00
+2026-03-03,Theo Branagh,theo.branagh@example.com,Full groom,105.00
+2026-03-04,Jonas Edelman,jonas.edelman@example.com,Full groom + de-shed,81.00
+2026-03-05,Aiyana Fairweather,aiyana.fairweather@example.com,Nail trim,80.00
+2026-03-05,Bess Thackeray,bess.thackeray@example.com,Bath & brush,60.00
+2026-03-05,Caleb Rasmussen,caleb.rasmussen@example.com,Bath & brush,55.00
+2026-03-05,Greta Faulkner,greta.faulkner@example.com,Teeth & nails,61.00
+2026-03-05,Matteo Ibarra,matteo.ibarra@example.com,Full groom,59.00
+2026-03-05,Pilar Umali,pilar.umali@example.com,Full groom,88.00
+2026-03-06,Hollis Quill,hollis.quill@example.com,Full groom,103.00
+2026-03-06,Umberto Drummond,umberto.drummond@example.com,Nail trim,68.00
+2026-03-07,Bennett Goodall,bennett.goodall@example.com,De-shed treatment,101.00
+2026-03-07,Caleb Fairweather,caleb.fairweather@example.com,Nail trim,71.00
+2026-03-07,Elif Lindqvist,elif.lindqvist@example.com,Nail trim,92.00
+2026-03-07,Lorena Xiong,lorena.xiong@example.com,Full groom,83.00
+2026-03-07,Quentin Bostwick,quentin.bostwick@example.com,Full groom,112.00
+2026-03-07,Tansy Xiong,tansy.xiong@example.com,Bath & brush,49.00
+2026-03-08,Elif Zeller,elif.zeller@example.com,De-shed treatment,75.00
+2026-03-08,Quentin Umali,quentin.umali@example.com,Bath & brush,77.00
+2026-03-09,Lela Fairweather,lela.fairweather@example.com,Teeth & nails,89.00
+2026-03-09,Quentin Thackeray,quentin.thackeray@example.com,Teeth & nails,60.00
+2026-03-09,Yusuf Birkeland,yusuf.birkeland@example.com,De-shed treatment,88.00
+2026-03-10,Nell Umali,nell.umali@example.com,Nail trim,92.00
+2026-03-10,Nia Xiong,nia.xiong@example.com,De-shed treatment,71.00
+2026-03-10,Tansy Birkeland,tansy.birkeland@example.com,Full groom,93.00
+2026-03-11,Arlo Ibarra,arlo.ibarra@example.com,Nail trim,118.00
+2026-03-11,Fern Xiong,fern.xiong@example.com,Full groom + de-shed,62.00
+2026-03-11,Imogen Xiong,imogen.xiong@example.com,Bath & brush,79.00
+2026-03-11,Odette Calloway,odette.calloway@example.com,De-shed treatment,101.00
+2026-03-11,Wendell Calloway,wendell.calloway@example.com,De-shed treatment,74.00
+2026-03-11,Wendell Cuthbert,wendell.cuthbert@example.com,Teeth & nails,57.00
+2026-03-11,walk-in,,Nail trim,20.00
+2026-03-12,Gus Umali,gus.umali@example.com,Nail trim,110.00
+2026-03-12,Umberto Obradovic,umberto.obradovic@example.com,Full groom + de-shed,93.00
+2026-03-13,Gus Whitlock,gus.whitlock@example.com,Full groom,77.00
+2026-03-14,Lela Birkeland,lela.birkeland@example.com,Teeth & nails,109.00
+2026-03-14,Moss Sandoval,moss.sandoval@example.com,Full groom,81.00
+2026-03-14,Silas Cuthbert,silas.cuthbert@example.com,De-shed treatment,61.00
+2026-03-16,Elif Birkeland,elif.birkeland@example.com,Full groom + de-shed,91.00
+2026-03-16,Hana Ainsley,hana.ainsley@example.com,Bath & brush,77.00
+2026-03-16,Kit Zeller,kit.zeller@example.com,Nail trim,64.00
+2026-03-16,Lela Zeller,lela.zeller@example.com,De-shed treatment,62.00
+2026-03-16,Nell Zeller,nell.zeller@example.com,De-shed treatment,105.00
+2026-03-16,Pilar Ainsley,pilar.ainsley@example.com,Nail trim,92.00
+2026-03-17,Bess Jernigan,bess.jernigan@example.com,Full groom,68.00
+2026-03-17,Pilar Northcutt,pilar.northcutt@example.com,Nail trim,77.00
+2026-03-17,Rosa Northcutt,rosa.northcutt@example.com,De-shed treatment,85.00
+2026-03-17,Ximena Delgado,ximena.delgado@example.com,Full groom + de-shed,110.00
+2026-03-18,Arlo Quill,arlo.quill@example.com,Full groom,78.00
+2026-03-18,Nell Thackeray,nell.thackeray@example.com,De-shed treatment,62.00
+2026-03-19,Aiyana Delgado,aiyana.delgado@example.com,Full groom + de-shed,91.00
+2026-03-19,Lela Lindqvist,lela.lindqvist@example.com,Full groom,57.00
+2026-03-19,Nell Eastman,nell.eastman@example.com,Full groom + de-shed,88.00
+2026-03-19,Wendell Umali,wendell.umali@example.com,Nail trim,89.00
+2026-03-19,Yusuf Mercado,yusuf.mercado@example.com,Teeth & nails,64.00
+2026-03-20,Pilar Cuthbert,pilar.cuthbert@example.com,De-shed treatment,76.00
+2026-03-20,Quentin Goodall,quentin.goodall@example.com,Full groom,73.00
+2026-03-21,Nell Birkeland,nell.birkeland@example.com,Full groom,63.00
+2026-03-21,Tansy Obradovic,tansy.obradovic@example.com,Teeth & nails,106.00
+2026-03-22,Emory Cuthbert,emory.cuthbert@example.com,Full groom + de-shed,80.00
+2026-03-22,Gideon Bostwick,gideon.bostwick@example.com,Full groom + de-shed,84.00
+2026-03-22,Hana Drummond,hana.drummond@example.com,Full groom,111.00
+2026-03-22,Hana Jernigan,hana.jernigan@example.com,Bath & brush,105.00
+2026-03-22,Imogen Bostwick,imogen.bostwick@example.com,Full groom,80.00
+2026-03-22,Silas Xiong,silas.xiong@example.com,Teeth & nails,92.00
+2026-03-22,Tansy Kowalczyk,tansy.kowalczyk@example.com,Nail trim,48.00
+2026-03-22,Yusuf Delgado,yusuf.delgado@example.com,Bath & brush,61.00
+2026-03-23,Moss Kowalczyk,moss.kowalczyk@example.com,Full groom + de-shed,72.00
+2026-03-23,Nia Vanterpool,nia.vanterpool@example.com,De-shed treatment,67.00
+2026-03-23,Oscar Birkeland,oscar.birkeland@example.com,Puppy intro groom,62.00
+2026-03-23,Umberto Quill,umberto.quill@example.com,Full groom + de-shed,60.00
+2026-03-24,Marisol Quintana,marisol.q@example.com,Bath & brush,88.00
+2026-03-24,Ximena Xiong,ximena.xiong@example.com,Nail trim,72.00
+2026-03-25,Lorena Birkeland,lorena.birkeland@example.com,De-shed treatment,58.00
+2026-03-26,Bennett Eastman,bennett.eastman@example.com,Full groom + de-shed,104.00
+2026-03-26,Caleb Fairweather,caleb.fairweather@example.com,Full groom + de-shed,75.00
+2026-03-26,Tansy Bostwick,tansy.bostwick@example.com,De-shed treatment,49.00
+2026-03-27,Jasper Zeller,jasper.zeller@example.com,De-shed treatment,80.00
+2026-03-28,Arlo Vanterpool,arlo.vanterpool@example.com,Nail trim,73.00
+2026-03-28,Elif Zeller,elif.zeller@example.com,De-shed treatment,73.00
+2026-03-28,Hollis Jernigan,hollis.jernigan@example.com,Full groom + de-shed,103.00
+2026-03-28,Quentin Cuthbert,quentin.cuthbert@example.com,Puppy intro groom,58.00
+2026-03-29,Gus Sandoval,gus.sandoval@example.com,Teeth & nails,79.00
+2026-03-29,Wendell Yarborough,wendell.yarborough@example.com,De-shed treatment,57.00
+2026-03-30,Caleb Rasmussen,caleb.rasmussen@example.com,De-shed treatment,56.00
+2026-03-30,Gideon Northcutt,gideon.northcutt@example.com,Puppy intro groom,66.00
+2026-03-30,Hana Thackeray,hana.thackeray@example.com,De-shed treatment,63.00
+2026-03-30,Ida Vanterpool,ida.vanterpool@example.com,Full groom + de-shed,110.00
+2026-03-30,Kit Obradovic,kit.obradovic@example.com,Full groom,48.00
+2026-03-30,Lorena Pemberton,lorena.pemberton@example.com,Bath & brush,60.00
+2026-03-31,Caleb Drummond,caleb.drummond@example.com,Full groom,94.00
+2026-03-31,Mika Sorensen,mika.sorensen@example.com,Bath & brush,72.00
+2026-03-31,Nell Umali,nell.umali@example.com,Puppy intro groom,103.00
+2026-03-31,Nia Ainsley,nia.ainsley@example.com,Nail trim,74.00
+2026-04-01,Bennett Goodall,bennett.goodall@example.com,De-shed treatment,99.00
+2026-04-01,Tansy Northcutt,tansy.northcutt@example.com,Teeth & nails,77.00
+2026-04-02,Bess Thackeray,bess.thackeray@example.com,Nail trim,52.00
+2026-04-02,Greta Faulkner,greta.faulkner@example.com,De-shed treatment,60.00
+2026-04-02,Nell Drummond,nell.drummond@example.com,Full groom + de-shed,116.00
+2026-04-03,Arlo Cuthbert,arlo.cuthbert@example.com,De-shed treatment,113.00
+2026-04-03,Lorena Xiong,lorena.xiong@example.com,Puppy intro groom,83.00
+2026-04-04,Cora Vanterpool,cora.vanterpool@example.com,Bath & brush,77.00
+2026-04-04,Pilar Ainsley,pilar.ainsley@example.com,Bath & brush,93.00
+2026-04-05,Bess Jernigan,bess.jernigan@example.com,Full groom + de-shed,73.00
+2026-04-05,Nia Xiong,nia.xiong@example.com,Bath & brush,66.00
+2026-04-05,Tansy Birkeland,tansy.birkeland@example.com,Full groom,101.00
+2026-04-05,Wendell Cuthbert,wendell.cuthbert@example.com,Teeth & nails,68.00
+2026-04-06,Odette Calloway,odette.calloway@example.com,Full groom + de-shed,101.00
+2026-04-06,Quentin Umali,quentin.umali@example.com,Bath & brush,63.00
+2026-04-07,Gus Mercado,gus.mercado@example.com,De-shed treatment,78.00
+2026-04-07,Gus Umali,gus.umali@example.com,Full groom,116.00
+2026-04-07,Matteo Obradovic,matteo.obradovic@example.com,Puppy intro groom,92.00
+2026-04-07,Pilar Northcutt,pilar.northcutt@example.com,Bath & brush,85.00
+2026-04-08,Cora Umali,cora.umali@example.com,Bath & brush,66.00
+2026-04-08,Imogen Xiong,imogen.xiong@example.com,Bath & brush,77.00
+2026-04-08,Theo Branagh,theo.branagh@example.com,Full groom + de-shed,98.00
+2026-04-08,Yusuf Fairweather,yusuf.fairweather@example.com,De-shed treatment,77.00
+2026-04-09,Kenji Cuthbert,kenji.cuthbert@example.com,Nail trim,60.00
+2026-04-09,Lela Birkeland,lela.birkeland@example.com,Bath & brush,107.00
+2026-04-09,Quentin Thackeray,quentin.thackeray@example.com,Nail trim,55.00
+2026-04-09,Wendell Umali,wendell.umali@example.com,Full groom,80.00
+2026-04-10,Moss Sandoval,moss.sandoval@example.com,Puppy intro groom,90.00
+2026-04-11,Lela Fairweather,lela.fairweather@example.com,Puppy intro groom,87.00
+2026-04-11,Nell Birkeland,nell.birkeland@example.com,Full groom + de-shed,56.00
+2026-04-11,Nell Zeller,nell.zeller@example.com,Full groom,118.00
+2026-04-11,Nia Vanterpool,nia.vanterpool@example.com,Puppy intro groom,66.00
+2026-04-12,Hana Ainsley,hana.ainsley@example.com,Nail trim,91.00
+2026-04-12,Jonas Edelman,jonas.edelman@example.com,Nail trim,81.00
+2026-04-12,Silas Cuthbert,silas.cuthbert@example.com,Teeth & nails,59.00
+2026-04-12,Ximena Xiong,ximena.xiong@example.com,Bath & brush,61.00
+2026-04-13,Arlo Ibarra,arlo.ibarra@example.com,Bath & brush,114.00
+2026-04-13,Fern Xiong,fern.xiong@example.com,Bath & brush,59.00
+2026-04-13,Rosa Northcutt,rosa.northcutt@example.com,Nail trim,80.00
+2026-04-14,Aiyana Delgado,aiyana.delgado@example.com,Bath & brush,88.00
+2026-04-14,Desmond Delgado,desmond.delgado@example.com,Full groom + de-shed,90.00
+2026-04-14,Elif Lindqvist,elif.lindqvist@example.com,Full groom,103.00
+2026-04-14,Nia Mercado,nia.mercado@example.com,Full groom,107.00
+2026-04-14,Tansy Bostwick,tansy.bostwick@example.com,Bath & brush,47.00
+2026-04-14,Umberto Obradovic,umberto.obradovic@example.com,Nail trim,89.00
+2026-04-15,Arlo Quill,arlo.quill@example.com,Full groom + de-shed,86.00
+2026-04-15,Bennett Kowalczyk,bennett.kowalczyk@example.com,De-shed treatment,73.00
+2026-04-15,Caleb Fairweather,caleb.fairweather@example.com,Nail trim,66.00
+2026-04-15,Nell Eastman,nell.eastman@example.com,Full groom,82.00
+2026-04-15,Pilar Cuthbert,pilar.cuthbert@example.com,Full groom,74.00
+2026-04-15,Ximena Delgado,ximena.delgado@example.com,Teeth & nails,117.00
+2026-04-16,Cora Pemberton,cora.pemberton@example.com,Bath & brush,91.00
+2026-04-16,Hana Jernigan,hana.jernigan@example.com,Teeth & nails,117.00
+2026-04-16,Quentin Goodall,quentin.goodall@example.com,Full groom + de-shed,77.00
+2026-04-16,Umberto Drummond,umberto.drummond@example.com,De-shed treatment,72.00
+2026-04-17,Gideon Bostwick,gideon.bostwick@example.com,Bath & brush,86.00
+2026-04-17,Hana Drummond,hana.drummond@example.com,Bath & brush,103.00
+2026-04-18,Lorena Birkeland,lorena.birkeland@example.com,Puppy intro groom,63.00
+2026-04-18,Moss Kowalczyk,moss.kowalczyk@example.com,Full groom + de-shed,87.00
+2026-04-18,Wendell Calloway,wendell.calloway@example.com,Full groom + de-shed,76.00
+2026-04-19,Elif Zeller,elif.zeller@example.com,Bath & brush,85.00
+2026-04-19,Tansy Obradovic,tansy.obradovic@example.com,Full groom + de-shed,117.00
+2026-04-20,Aiyana Fairweather,aiyana.fairweather@example.com,Teeth & nails,81.00
+2026-04-21,Marisol Quintana,marisol.q@example.com,Full groom,93.00
+2026-04-21,Nell Umali,nell.umali@example.com,Full groom,93.00
+2026-04-21,Yusuf Mercado,yusuf.mercado@example.com,Puppy intro groom,71.00
+2026-04-22,Bennett Eastman,bennett.eastman@example.com,Full groom + de-shed,108.00
+2026-04-23,Caleb Rasmussen,caleb.rasmussen@example.com,Teeth & nails,56.00
+2026-04-23,Kit Zeller,kit.zeller@example.com,Teeth & nails,62.00
+2026-04-23,Rafael Dominguez,rafael.dominguez@example.com,Full groom,90.00
+2026-04-23,Umberto Quill,umberto.quill@example.com,Full groom + de-shed,51.00
+2026-04-23,Wendell Northcutt,wendell.northcutt@example.com,Puppy intro groom,56.00
+2026-04-24,Gus Whitlock,gus.whitlock@example.com,Full groom + de-shed,76.00
+2026-04-24,Pilar Ainsley,pilar.ainsley@example.com,Bath & brush,89.00
+2026-04-24,Pilar Thackeray,pilar.thackeray@example.com,Full groom + de-shed,101.00
+2026-04-25,Bennett Goodall,bennett.goodall@example.com,Full groom,96.00
+2026-04-25,Bess Jernigan,bess.jernigan@example.com,Puppy intro groom,69.00
+2026-04-25,Lela Lindqvist,lela.lindqvist@example.com,Nail trim,66.00
+2026-04-26,Evelyn Hartree,evelyn.hartree@example.com,Full groom + de-shed,160.00
+2026-04-26,Lela Zeller,lela.zeller@example.com,Full groom,70.00
+2026-04-26,Pilar Umali,pilar.umali@example.com,Bath & brush,88.00
+2026-04-26,Quentin Bostwick,quentin.bostwick@example.com,Full groom,118.00
+2026-04-27,Emory Cuthbert,emory.cuthbert@example.com,Puppy intro groom,80.00
+2026-04-27,Hollis Jernigan,hollis.jernigan@example.com,Teeth & nails,118.00
+2026-04-27,Kit Obradovic,kit.obradovic@example.com,Teeth & nails,60.00
+2026-04-27,Quentin Cuthbert,quentin.cuthbert@example.com,Teeth & nails,59.00
+2026-04-28,Bess Thackeray,bess.thackeray@example.com,Full groom,56.00
+2026-04-28,Lorena Xiong,lorena.xiong@example.com,Bath & brush,84.00
+2026-04-28,Pilar Northcutt,pilar.northcutt@example.com,Puppy intro groom,89.00
+2026-04-28,Umberto Ainsley,umberto.ainsley@example.com,De-shed treatment,57.00
+2026-04-28,Wendell Umali,wendell.umali@example.com,Bath & brush,92.00
+2026-04-29,Caleb Drummond,caleb.drummond@example.com,Bath & brush,101.00
+2026-04-29,Gus Sandoval,gus.sandoval@example.com,Bath & brush,80.00
+2026-04-30,Tansy Xiong,tansy.xiong@example.com,Nail trim,47.00
+2026-05-01,Nell Birkeland,nell.birkeland@example.com,Full groom + de-shed,55.00
+2026-05-01,Tansy Birkeland,tansy.birkeland@example.com,Full groom + de-shed,87.00
+2026-05-01,Wendell Cuthbert,wendell.cuthbert@example.com,Bath & brush,70.00
+2026-05-02,Gideon Northcutt,gideon.northcutt@example.com,Full groom,66.00
+2026-05-02,Nell Thackeray,nell.thackeray@example.com,De-shed treatment,47.00
+2026-05-02,Yusuf Birkeland,yusuf.birkeland@example.com,Full groom + de-shed,90.00
+2026-05-02,walk-in,,Nail trim,20.00
+2026-05-03,Gus Umali,gus.umali@example.com,Teeth & nails,114.00
+2026-05-03,Hana Thackeray,hana.thackeray@example.com,Full groom,48.00
+2026-05-03,Ida Vanterpool,ida.vanterpool@example.com,De-shed treatment,111.00
+2026-05-03,Ximena Xiong,ximena.xiong@example.com,Nail trim,67.00
+2026-05-04,Arlo Cuthbert,arlo.cuthbert@example.com,Bath & brush,117.00
+2026-05-04,Greta Faulkner,greta.faulkner@example.com,Bath & brush,68.00
+2026-05-04,Hollis Quill,hollis.quill@example.com,Nail trim,103.00
+2026-05-04,Nia Vanterpool,nia.vanterpool@example.com,De-shed treatment,71.00
+2026-05-04,Nia Xiong,nia.xiong@example.com,Nail trim,65.00
+2026-05-04,Umberto Calloway,umberto.calloway@example.com,Full groom,73.00
+2026-05-05,Caleb Fairweather,caleb.fairweather@example.com,Full groom,74.00
+2026-05-05,Matteo Ibarra,matteo.ibarra@example.com,Full groom,50.00
+2026-05-06,Mika Sorensen,mika.sorensen@example.com,Bath & brush,75.00
+2026-05-06,Moss Sandoval,moss.sandoval@example.com,Full groom,81.00
+2026-05-06,Odette Calloway,odette.calloway@example.com,Teeth & nails,101.00
+2026-05-06,Oscar Birkeland,oscar.birkeland@example.com,Teeth & nails,68.00
+2026-05-07,Nia Ainsley,nia.ainsley@example.com,Full groom,72.00
+2026-05-07,Quentin Thackeray,quentin.thackeray@example.com,Puppy intro groom,61.00
+2026-05-07,Quentin Umali,quentin.umali@example.com,Full groom + de-shed,67.00
+2026-05-07,Tansy Bostwick,tansy.bostwick@example.com,Nail trim,59.00
+2026-05-08,Lela Birkeland,lela.birkeland@example.com,Teeth & nails,102.00
+2026-05-08,Lorena Pemberton,lorena.pemberton@example.com,De-shed treatment,57.00
+2026-05-09,Imogen Xiong,imogen.xiong@example.com,Full groom + de-shed,78.00
+2026-05-09,Nell Zeller,nell.zeller@example.com,Puppy intro groom,108.00
+2026-05-10,Elif Birkeland,elif.birkeland@example.com,Bath & brush,101.00
+2026-05-10,Pilar Cuthbert,pilar.cuthbert@example.com,Puppy intro groom,77.00
+2026-05-11,Cora Vanterpool,cora.vanterpool@example.com,De-shed treatment,79.00
+2026-05-11,Elif Zeller,elif.zeller@example.com,Full groom + de-shed,80.00
+2026-05-11,Imogen Bostwick,imogen.bostwick@example.com,Bath & brush,86.00
+2026-05-11,Sun-Hee Park,sunhee.park@example.com,Full groom + de-shed,110.00
+2026-05-11,Yusuf Delgado,yusuf.delgado@example.com,Nail trim,58.00
+2026-05-12,Hana Ainsley,hana.ainsley@example.com,Full groom,84.00
+2026-05-12,Hana Jernigan,hana.jernigan@example.com,Bath & brush,104.00
+2026-05-12,Nell Umali,nell.umali@example.com,Puppy intro groom,93.00
+2026-05-12,Theo Branagh,theo.branagh@example.com,Puppy intro groom,100.00
+2026-05-13,Aiyana Delgado,aiyana.delgado@example.com,Puppy intro groom,97.00
+2026-05-13,Hana Drummond,hana.drummond@example.com,Puppy intro groom,111.00
+2026-05-13,Lela Fairweather,lela.fairweather@example.com,Bath & brush,96.00
+2026-05-13,Moss Kowalczyk,moss.kowalczyk@example.com,Full groom + de-shed,83.00
+2026-05-13,Umberto Obradovic,umberto.obradovic@example.com,Teeth & nails,98.00
+2026-05-14,Gideon Bostwick,gideon.bostwick@example.com,De-shed treatment,73.00
+2026-05-14,Wendell Yarborough,wendell.yarborough@example.com,Full groom,72.00
+2026-05-14,Ximena Vanterpool,ximena.vanterpool@example.com,De-shed treatment,63.00
+2026-05-15,Arlo Quill,arlo.quill@example.com,De-shed treatment,81.00
+2026-05-15,Bess Jernigan,bess.jernigan@example.com,Full groom,65.00
+2026-05-15,Lorena Birkeland,lorena.birkeland@example.com,Full groom + de-shed,62.00
+2026-05-15,Nell Drummond,nell.drummond@example.com,De-shed treatment,108.00
+2026-05-15,Quentin Goodall,quentin.goodall@example.com,Teeth & nails,69.00
+2026-05-15,Silas Cuthbert,silas.cuthbert@example.com,Bath & brush,63.00
+2026-05-16,Fern Xiong,fern.xiong@example.com,Full groom + de-shed,47.00
+2026-05-16,Pilar Ainsley,pilar.ainsley@example.com,Full groom,89.00
+2026-05-16,Rosa Northcutt,rosa.northcutt@example.com,Teeth & nails,87.00
+2026-05-17,Nell Eastman,nell.eastman@example.com,Full groom + de-shed,85.00
+2026-05-17,Tansy Obradovic,tansy.obradovic@example.com,Full groom + de-shed,103.00
+2026-05-18,Arlo Ibarra,arlo.ibarra@example.com,Teeth & nails,111.00
+2026-05-18,Elif Lindqvist,elif.lindqvist@example.com,Full groom + de-shed,97.00
+2026-05-18,Pilar Northcutt,pilar.northcutt@example.com,Nail trim,84.00
+2026-05-18,Yusuf Mercado,yusuf.mercado@example.com,Full groom + de-shed,62.00
+2026-05-19,Caleb Rasmussen,caleb.rasmussen@example.com,Nail trim,61.00
+2026-05-19,Marisol Quintana,marisol.q@example.com,Bath & brush,78.00
+2026-05-19,Wendell Umali,wendell.umali@example.com,De-shed treatment,92.00
+2026-05-20,Nell Birkeland,nell.birkeland@example.com,De-shed treatment,49.00
+2026-05-20,Wendell Calloway,wendell.calloway@example.com,Full groom + de-shed,70.00
+2026-05-21,Umberto Quill,umberto.quill@example.com,Teeth & nails,50.00
+2026-05-22,Bennett Eastman,bennett.eastman@example.com,Puppy intro groom,107.00
+2026-05-22,Bennett Goodall,bennett.goodall@example.com,Nail trim,89.00
+2026-05-22,Jonas Edelman,jonas.edelman@example.com,De-shed treatment,80.00
+2026-05-22,Lorena Xiong,lorena.xiong@example.com,Full groom,77.00
+2026-05-22,Nia Mercado,nia.mercado@example.com,Bath & brush,108.00
+2026-05-24,Wendell Cuthbert,wendell.cuthbert@example.com,Full groom,69.00
+2026-05-25,Nia Vanterpool,nia.vanterpool@example.com,Nail trim,62.00
+2026-05-25,Quentin Cuthbert,quentin.cuthbert@example.com,Teeth & nails,67.00
+2026-05-26,Bess Thackeray,bess.thackeray@example.com,De-shed treatment,63.00
+2026-05-26,Caleb Fairweather,caleb.fairweather@example.com,Bath & brush,78.00
+2026-05-26,Cora Pemberton,cora.pemberton@example.com,De-shed treatment,83.00
+2026-05-26,Gus Sandoval,gus.sandoval@example.com,Full groom,76.00
+2026-05-26,Hollis Jernigan,hollis.jernigan@example.com,Nail trim,114.00
+2026-05-26,Kit Zeller,kit.zeller@example.com,Nail trim,63.00
+2026-05-26,Tansy Birkeland,tansy.birkeland@example.com,Bath & brush,89.00
+2026-05-26,Ximena Xiong,ximena.xiong@example.com,Nail trim,61.00
+2026-05-27,Jasper Zeller,jasper.zeller@example.com,Full groom + de-shed,88.00
+2026-05-27,Lela Lindqvist,lela.lindqvist@example.com,De-shed treatment,70.00
+2026-05-28,Arlo Vanterpool,arlo.vanterpool@example.com,Bath & brush,75.00
+2026-05-28,Kenji Cuthbert,kenji.cuthbert@example.com,Teeth & nails,51.00
+2026-05-28,Kit Obradovic,kit.obradovic@example.com,Full groom + de-shed,50.00
+2026-05-28,Tansy Bostwick,tansy.bostwick@example.com,De-shed treatment,52.00
+2026-05-29,Emory Cuthbert,emory.cuthbert@example.com,Bath & brush,84.00
+2026-05-29,Tansy Northcutt,tansy.northcutt@example.com,Bath & brush,72.00
+2026-05-30,Caleb Drummond,caleb.drummond@example.com,Puppy intro groom,91.00
+2026-05-30,Elif Zeller,elif.zeller@example.com,Bath & brush,74.00
+2026-05-31,Gus Umali,gus.umali@example.com,Teeth & nails,113.00
+2026-05-31,Nia Xiong,nia.xiong@example.com,Puppy intro groom,64.00
+2026-05-31,Umberto Drummond,umberto.drummond@example.com,Teeth & nails,58.00
+2026-06-01,Desmond Delgado,desmond.delgado@example.com,Full groom,92.00
+2026-06-01,Gideon Northcutt,gideon.northcutt@example.com,Bath & brush,64.00
+2026-06-02,Cora Umali,cora.umali@example.com,Bath & brush,64.00
+2026-06-02,Greta Faulkner,greta.faulkner@example.com,Full groom,65.00
+2026-06-02,Gus Whitlock,gus.whitlock@example.com,Bath & brush,69.00
+2026-06-02,Matteo Obradovic,matteo.obradovic@example.com,Bath & brush,97.00
+2026-06-02,Nell Umali,nell.umali@example.com,Nail trim,102.00
+2026-06-02,Pilar Cuthbert,pilar.cuthbert@example.com,Teeth & nails,76.00
+2026-06-02,Rafael Dominguez,rafael.dominguez@example.com,Full groom,92.00
+2026-06-04,Gus Mercado,gus.mercado@example.com,Full groom,79.00
+2026-06-04,Lela Birkeland,lela.birkeland@example.com,Bath & brush,106.00
+2026-06-04,Moss Sandoval,moss.sandoval@example.com,Teeth & nails,81.00
+2026-06-04,Odette Calloway,odette.calloway@example.com,Teeth & nails,109.00
+2026-06-04,Pilar Ainsley,pilar.ainsley@example.com,Full groom + de-shed,82.00
+2026-06-05,Ida Vanterpool,ida.vanterpool@example.com,Teeth & nails,102.00
+2026-06-05,Imogen Xiong,imogen.xiong@example.com,Full groom + de-shed,83.00
+2026-06-05,Quentin Umali,quentin.umali@example.com,Puppy intro groom,71.00
+2026-06-05,Ximena Delgado,ximena.delgado@example.com,Puppy intro groom,104.00
+2026-06-06,Aiyana Fairweather,aiyana.fairweather@example.com,Teeth & nails,82.00
+2026-06-06,Bess Jernigan,bess.jernigan@example.com,De-shed treatment,66.00
+2026-06-06,Hana Thackeray,hana.thackeray@example.com,Teeth & nails,48.00
+2026-06-06,Mika Sorensen,mika.sorensen@example.com,Bath & brush,72.00
+2026-06-06,Moss Kowalczyk,moss.kowalczyk@example.com,Full groom,81.00
+2026-06-06,Nell Zeller,nell.zeller@example.com,Teeth & nails,102.00
+2026-06-07,Hana Jernigan,hana.jernigan@example.com,Bath & brush,104.00
+2026-06-07,Lela Zeller,lela.zeller@example.com,Teeth & nails,64.00
+2026-06-07,Wendell Umali,wendell.umali@example.com,Full groom,89.00
+2026-06-08,Aiyana Delgado,aiyana.delgado@example.com,Teeth & nails,93.00
+2026-06-08,Gideon Bostwick,gideon.bostwick@example.com,Puppy intro groom,74.00
+2026-06-08,Lorena Birkeland,lorena.birkeland@example.com,Teeth & nails,61.00
+2026-06-08,Pilar Northcutt,pilar.northcutt@example.com,Full groom + de-shed,87.00
+2026-06-09,Quentin Thackeray,quentin.thackeray@example.com,Full groom + de-shed,59.00
+2026-06-09,Sun-Hee Park,sunhee.park@example.com,Nail trim,110.00
+2026-06-10,Hana Drummond,hana.drummond@example.com,Puppy intro groom,106.00
+2026-06-11,Arlo Quill,arlo.quill@example.com,Bath & brush,87.00
+2026-06-11,Caleb Rasmussen,caleb.rasmussen@example.com,Puppy intro groom,54.00
+2026-06-11,Hana Ainsley,hana.ainsley@example.com,Teeth & nails,84.00
+2026-06-12,Arlo Cuthbert,arlo.cuthbert@example.com,Puppy intro groom,103.00
+2026-06-12,Bennett Kowalczyk,bennett.kowalczyk@example.com,Full groom + de-shed,63.00
+2026-06-12,Nell Birkeland,nell.birkeland@example.com,Full groom,54.00
+2026-06-12,Umberto Obradovic,umberto.obradovic@example.com,Nail trim,97.00
+2026-06-14,Lorena Xiong,lorena.xiong@example.com,Puppy intro groom,90.00
+2026-06-14,Nia Ainsley,nia.ainsley@example.com,Nail trim,76.00
+2026-06-14,Pilar Thackeray,pilar.thackeray@example.com,Puppy intro groom,94.00
+2026-06-14,Pilar Umali,pilar.umali@example.com,Nail trim,84.00
+2026-06-14,Quentin Goodall,quentin.goodall@example.com,Nail trim,70.00
+2026-06-14,Rosa Northcutt,rosa.northcutt@example.com,Teeth & nails,85.00
+2026-06-15,Cora Vanterpool,cora.vanterpool@example.com,Nail trim,78.00
+2026-06-15,Nell Eastman,nell.eastman@example.com,Nail trim,80.00
+2026-06-15,Wendell Northcutt,wendell.northcutt@example.com,Full groom + de-shed,50.00
+2026-06-16,Marisol Quintana,marisol.q@example.com,Full groom,89.00
+2026-06-16,Nia Vanterpool,nia.vanterpool@example.com,Puppy intro groom,58.00
+2026-06-16,Tansy Obradovic,tansy.obradovic@example.com,Puppy intro groom,108.00
+2026-06-17,Lela Fairweather,lela.fairweather@example.com,Puppy intro groom,94.00
+2026-06-17,Oscar Birkeland,oscar.birkeland@example.com,Full groom + de-shed,77.00
+2026-06-17,Silas Cuthbert,silas.cuthbert@example.com,Full groom + de-shed,57.00
+2026-06-18,Caleb Fairweather,caleb.fairweather@example.com,Full groom + de-shed,69.00
+2026-06-18,Tansy Bostwick,tansy.bostwick@example.com,De-shed treatment,52.00
+2026-06-18,Ximena Xiong,ximena.xiong@example.com,Full groom + de-shed,71.00
+2026-06-18,Yusuf Mercado,yusuf.mercado@example.com,Bath & brush,74.00
+2026-06-19,Nia Fairweather,nia.fairweather@example.com,De-shed treatment,75.00
+2026-06-19,Wendell Cuthbert,wendell.cuthbert@example.com,De-shed treatment,66.00
+2026-06-20,Elif Zeller,elif.zeller@example.com,Full groom,79.00
+2026-06-20,Fern Xiong,fern.xiong@example.com,Full groom + de-shed,49.00
+2026-06-20,Silas Xiong,silas.xiong@example.com,Full groom,103.00
+2026-06-20,Vera Whitlock,vera.whitlock2@example.com,Refund - skin reaction,-25.00
+2026-06-20,Vera Zeller,vera.zeller@example.com,Full groom + de-shed,60.00
+2026-06-21,Bennett Eastman,bennett.eastman@example.com,Puppy intro groom,103.00
+2026-06-21,Bess Thackeray,bess.thackeray@example.com,Bath & brush,56.00
+2026-06-21,Elif Lindqvist,elif.lindqvist@example.com,De-shed treatment,96.00
+2026-06-21,Tansy Birkeland,tansy.birkeland@example.com,Puppy intro groom,95.00
+2026-06-22,Lorena Pemberton,lorena.pemberton@example.com,Puppy intro groom,51.00
+2026-06-22,Nell Umali,nell.umali@example.com,Puppy intro groom,98.00
+2026-06-22,Umberto Northcutt,umberto.northcutt@example.com,Bath & brush,75.00
+2026-06-23,Arlo Ibarra,arlo.ibarra@example.com,De-shed treatment,117.00
+2026-06-23,Nell Thackeray,nell.thackeray@example.com,Full groom,54.00
+2026-06-24,Hollis Jernigan,hollis.jernigan@example.com,Full groom,111.00
+2026-06-24,Tansy Xiong,tansy.xiong@example.com,Nail trim,47.00
+2026-06-24,Wendell Calloway,wendell.calloway@example.com,Full groom + de-shed,69.00
+2026-06-26,Bess Jernigan,bess.jernigan@example.com,Teeth & nails,66.00
+2026-06-26,Nell Drummond,nell.drummond@example.com,Bath & brush,117.00
+2026-06-26,Pilar Ainsley,pilar.ainsley@example.com,De-shed treatment,82.00
+2026-06-26,Yusuf Birkeland,yusuf.birkeland@example.com,De-shed treatment,85.00
+2026-06-27,Kit Obradovic,kit.obradovic@example.com,Full groom + de-shed,61.00
+2026-06-27,Pilar Cuthbert,pilar.cuthbert@example.com,Bath & brush,69.00
+2026-06-27,Pilar Northcutt,pilar.northcutt@example.com,Nail trim,78.00
+2026-06-27,Wendell Umali,wendell.umali@example.com,De-shed treatment,87.00
+2026-06-28,Gus Sandoval,gus.sandoval@example.com,Bath & brush,75.00
+2026-06-28,Hollis Quill,hollis.quill@example.com,De-shed treatment,89.00
+2026-06-29,Aiyana Northcutt,aiyana.northcutt@example.com,Puppy intro groom,75.00
+2026-06-29,Gus Umali,gus.umali@example.com,Teeth & nails,109.00
+2026-06-29,Jonas Edelman,jonas.edelman@example.com,Full groom,79.00
+2026-06-30,Caleb Drummond,caleb.drummond@example.com,Full groom + de-shed,95.00
+2026-06-30,Greta Faulkner,greta.faulkner@example.com,Bath & brush,66.00
+2026-06-30,Kit Zeller,kit.zeller@example.com,Bath & brush,77.00
+2026-07-01,Gideon Bostwick,gideon.bostwick@example.com,Full groom,82.00
+2026-07-01,Hana Jernigan,hana.jernigan@example.com,Bath & brush,111.00
+2026-07-01,Lela Lindqvist,lela.lindqvist@example.com,Full groom,69.00
+2026-07-01,Moss Sandoval,moss.sandoval@example.com,Full groom,92.00
+2026-07-02,Gideon Northcutt,gideon.northcutt@example.com,Puppy intro groom,57.00
+2026-07-02,Lela Birkeland,lela.birkeland@example.com,De-shed treatment,117.00
+2026-07-02,Nell Birkeland,nell.birkeland@example.com,Full groom,58.00
+2026-07-02,Nell Yarborough,nell.yarborough@example.com,Puppy intro groom,120.00
+2026-07-03,Emory Cuthbert,emory.cuthbert@example.com,Full groom,85.00
+2026-07-03,Odette Calloway,odette.calloway@example.com,Full groom + de-shed,108.00
+2026-07-03,Quentin Umali,quentin.umali@example.com,Full groom,63.00
+2026-07-03,Umberto Quill,umberto.quill@example.com,De-shed treatment,57.00
+2026-07-04,Caleb Rasmussen,caleb.rasmussen@example.com,Nail trim,52.00
+2026-07-04,Imogen Xiong,imogen.xiong@example.com,Nail trim,87.00
+2026-07-05,Nell Zeller,nell.zeller@example.com,Teeth & nails,115.00
+2026-07-06,Quentin Thackeray,quentin.thackeray@example.com,Full groom,62.00
+2026-07-07,Arlo Quill,arlo.quill@example.com,Full groom,93.00
+2026-07-07,Hana Drummond,hana.drummond@example.com,Teeth & nails,117.00
+2026-07-07,Nia Vanterpool,nia.vanterpool@example.com,Full groom,65.00
+2026-07-07,Tansy Bostwick,tansy.bostwick@example.com,Bath & brush,59.00
+2026-07-07,Ximena Xiong,ximena.xiong@example.com,Teeth & nails,63.00
+2026-07-08,Aiyana Delgado,aiyana.delgado@example.com,Puppy intro groom,91.00
+2026-07-08,Moss Kowalczyk,moss.kowalczyk@example.com,Nail trim,73.00
+2026-07-08,Umberto Drummond,umberto.drummond@example.com,Puppy intro groom,65.00
+2026-07-09,Bennett Goodall,bennett.goodall@example.com,De-shed treatment,95.00
+2026-07-09,Caleb Fairweather,caleb.fairweather@example.com,Teeth & nails,71.00
+2026-07-10,Lorena Xiong,lorena.xiong@example.com,Full groom,81.00
+2026-07-10,Quentin Goodall,quentin.goodall@example.com,De-shed treatment,76.00
+2026-07-10,Sun-Hee Park,sunhee.park@example.com,Puppy intro groom,110.00
+2026-07-11,Nell Umali,nell.umali@example.com,Full groom,98.00
+2026-07-12,Ida Vanterpool,ida.vanterpool@example.com,Full groom,113.00
+2026-07-12,Mika Sorensen,Mika.Sorensen@example.com,Bath & brush,72.00
+2026-07-12,Theo Branagh,theo.branagh@example.com,Bath & brush,102.00
+2026-07-12,Wendell Cuthbert,wendell.cuthbert@example.com,Full groom + de-shed,62.00
+2026-07-13,Elif Zeller,elif.zeller@example.com,Nail trim,87.00
+2026-07-13,Nia Xiong,nia.xiong@example.com,Puppy intro groom,71.00
+2026-07-13,Yusuf Fairweather,yusuf.fairweather@example.com,Puppy intro groom,89.00
+2026-07-14,Hana Ainsley,hana.ainsley@example.com,Nail trim,84.00
+2026-07-14,Hana Thackeray,hana.thackeray@example.com,De-shed treatment,59.00
+2026-07-14,Rosa Northcutt,rosa.northcutt@example.com,Puppy intro groom,84.00
+2026-07-14,Umberto Obradovic,umberto.obradovic@example.com,Nail trim,98.00
+2026-07-15,Nell Eastman,nell.eastman@example.com,Nail trim,80.00
+2026-07-16,Gus Whitlock,gus.whitlock@example.com,Puppy intro groom,62.00
+2026-07-16,Kenji Cuthbert,kenji.cuthbert@example.com,Teeth & nails,55.00
+2026-07-16,Pilar Ainsley,pilar.ainsley@example.com,Full groom,93.00
+2026-07-16,Quentin Cuthbert,quentin.cuthbert@example.com,Full groom + de-shed,66.00
+2026-07-16,Tansy Birkeland,tansy.birkeland@example.com,Full groom + de-shed,87.00
+2026-07-16,Yusuf Mercado,yusuf.mercado@example.com,De-shed treatment,76.00
+2026-07-17,Bess Jernigan,bess.jernigan@example.com,De-shed treatment,69.00
+2026-07-17,Bess Northcutt,bess.northcutt@example.com,Bath & brush,95.00
+2026-07-17,Desmond Delgado,desmond.delgado@example.com,Full groom,100.00
+2026-07-17,Nia Ainsley,nia.ainsley@example.com,Full groom + de-shed,78.00
+2026-07-17,Tansy Obradovic,tansy.obradovic@example.com,De-shed treatment,117.00
+2026-07-17,Wendell Umali,wendell.umali@example.com,Teeth & nails,89.00
+2026-07-19,Lela Fairweather,lela.fairweather@example.com,Full groom,90.00
+2026-07-19,Marisol Quintana,marisol.q@example.com,Bath & brush,92.00
+2026-07-20,Bess Thackeray,bess.thackeray@example.com,Puppy intro groom,55.00
+2026-07-20,Tansy Northcutt,tansy.northcutt@example.com,Bath & brush,74.00
+2026-07-21,Bennett Eastman,bennett.eastman@example.com,Full groom + de-shed,113.00
+2026-07-21,Cora Vanterpool,cora.vanterpool@example.com,Full groom,72.00
+2026-07-21,Lorena Birkeland,lorena.birkeland@example.com,Full groom + de-shed,67.00
+2026-07-22,Nell Birkeland,nell.birkeland@example.com,Bath & brush,52.00
+2026-07-22,Pilar Cuthbert,pilar.cuthbert@example.com,Teeth & nails,78.00
+2026-07-25,Gus Mercado,gus.mercado@example.com,De-shed treatment,88.00
+2026-07-25,Hollis Jernigan,hollis.jernigan@example.com,Puppy intro groom,110.00
+2026-07-25,Oscar Vanterpool,oscar.vanterpool@example.com,De-shed treatment,95.00
+2026-07-25,Pilar Northcutt,pilar.northcutt@example.com,De-shed treatment,91.00
+2026-07-26,Fern Xiong,fern.xiong@example.com,Nail trim,54.00
+2026-07-26,Gideon Bostwick,gideon.bostwick@example.com,Puppy intro groom,86.00
+2026-07-27,Elif Lindqvist,elif.lindqvist@example.com,Nail trim,92.00
+2026-07-27,Hana Jernigan,hana.jernigan@example.com,Full groom,115.00
+2026-07-27,Matteo Obradovic,matteo.obradovic@example.com,Nail trim,92.00
+2026-07-28,Caleb Drummond,caleb.drummond@example.com,Full groom + de-shed,98.00
+2026-07-28,Caleb Fairweather,caleb.fairweather@example.com,Nail trim,74.00
+2026-07-28,Lela Birkeland,lela.birkeland@example.com,Full groom,105.00
+2026-07-28,Ximena Xiong,ximena.xiong@example.com,Bath & brush,70.00
+2026-07-29,Gus Umali,gus.umali@example.com,Full groom + de-shed,113.00
+2026-07-29,Moss Sandoval,moss.sandoval@example.com,Full groom,78.00
+2026-07-29,Oscar Birkeland,oscar.birkeland@example.com,Full groom,63.00
+2026-07-29,Tansy Bostwick,tansy.bostwick@example.com,Puppy intro groom,49.00
+2026-07-30,Caleb Rasmussen,caleb.rasmussen@example.com,Full groom + de-shed,59.00
+2026-07-30,Nia Vanterpool,nia.vanterpool@example.com,De-shed treatment,69.00
+2026-07-30,Odette Calloway,odette.calloway@example.com,Bath & brush,107.00
+2026-07-30,Wendell Calloway,wendell.calloway@example.com,Puppy intro groom,72.00
+2026-07-31,Gideon Northcutt,gideon.northcutt@example.com,Puppy intro groom,66.00
+2026-07-31,Gus Sandoval,gus.sandoval@example.com,Full groom,83.00
+2026-07-31,Wendell Yarborough,wendell.yarborough@example.com,De-shed treatment,72.00
+2026-08-01,Imogen Xiong,imogen.xiong@example.com,Nail trim,79.00
+2026-08-01,Nell Zeller,nell.zeller@example.com,De-shed treatment,113.00
+2026-08-02,Arlo Quill,arlo.quill@example.com,Full groom,86.00
+2026-08-02,Nell Umali,nell.umali@example.com,Puppy intro groom,94.00
+2026-08-03,Elif Zeller,elif.zeller@example.com,Puppy intro groom,77.00
+2026-08-04,Aiyana Delgado,aiyana.delgado@example.com,Bath & brush,97.00
+2026-08-04,Imogen Bostwick,imogen.bostwick@example.com,Full groom,80.00
+2026-08-04,Lorena Pemberton,lorena.pemberton@example.com,Bath & brush,53.00
+2026-08-04,Quentin Umali,quentin.umali@example.com,Full groom + de-shed,74.00
+2026-08-05,Bess Jernigan,bess.jernigan@example.com,Full groom,68.00
+2026-08-05,Hana Drummond,hana.drummond@example.com,Nail trim,112.00
+2026-08-06,Jonas Edelman,jonas.edelman@example.com,Full groom + de-shed,72.00
+2026-08-06,Lela Lindqvist,lela.lindqvist@example.com,Teeth & nails,58.00
+2026-08-06,Yusuf Delgado,yusuf.delgado@example.com,Puppy intro groom,58.00
+2026-08-07,Lorena Xiong,lorena.xiong@example.com,Puppy intro groom,88.00
+2026-08-07,phone booking,,Bath & brush,55.00
+2026-08-08,Quentin Thackeray,quentin.thackeray@example.com,De-shed treatment,53.00
+2026-08-10,Emory Cuthbert,emory.cuthbert@example.com,De-shed treatment,81.00
+2026-08-11,Greta Faulkner,greta.faulkner@example.com,De-shed treatment,66.00
+2026-08-11,Nell Eastman,nell.eastman@example.com,Nail trim,85.00
+2026-08-11,Nia Mercado,nia.mercado@example.com,Full groom,106.00
+2026-08-12,Cora Pemberton,cora.pemberton@example.com,Teeth & nails,82.00
+2026-08-12,Nell Birkeland,nell.birkeland@example.com,Full groom,61.00
+2026-08-12,Silas Cuthbert,silas.cuthbert@example.com,Nail trim,51.00
+2026-08-12,Tansy Birkeland,tansy.birkeland@example.com,Full groom,95.00
+2026-08-12,Umberto Obradovic,umberto.obradovic@example.com,Puppy intro groom,102.00
+2026-08-13,Nell Thackeray,nell.thackeray@example.com,Puppy intro groom,62.00
+2026-08-13,Tansy Obradovic,tansy.obradovic@example.com,Puppy intro groom,113.00
+2026-08-14,Mika Sorensen,Mika.Sorensen@example.com,Bath & brush,73.00
+2026-08-14,Mika Sorensen,Mika.Sorensen@example.com,Nail trim,15.00
+2026-08-14,Nell Abernathy,nell.abernathy@example.com,De-shed treatment,85.00
+2026-08-16,Bennett Eastman,bennett.eastman@example.com,Nail trim,108.00
+2026-08-16,Pilar Cuthbert,pilar.cuthbert@example.com,Teeth & nails,69.00
+2026-08-17,Matteo Ibarra,matteo.ibarra@example.com,Full groom,54.00
+2026-08-17,Ximena Xiong,ximena.xiong@example.com,De-shed treatment,59.00
+2026-08-18,Caleb Fairweather,caleb.fairweather@example.com,Bath & brush,64.00
+2026-08-19,Ida Vanterpool,ida.vanterpool@example.com,Full groom + de-shed,116.00
+2026-08-20,Jasper Zeller,jasper.zeller@example.com,Full groom + de-shed,78.00
+2026-08-20,Nia Vanterpool,nia.vanterpool@example.com,Full groom + de-shed,71.00
+2026-08-22,Aiyana Fairweather,aiyana.fairweather@example.com,Nail trim,88.00
+2026-08-22,Elif Zeller,elif.zeller@example.com,Nail trim,81.00
+2026-08-22,Lela Zeller,lela.zeller@example.com,Bath & brush,66.00
+2026-08-22,Tansy Bostwick,tansy.bostwick@example.com,De-shed treatment,57.00
+2026-08-23,Arlo Ibarra,arlo.ibarra@example.com,Full groom,103.00
+2026-08-23,Hana Jernigan,hana.jernigan@example.com,Teeth & nails,106.00
+2026-08-24,Caleb Rasmussen,caleb.rasmussen@example.com,De-shed treatment,53.00
+2026-08-24,Kit Obradovic,kit.obradovic@example.com,Bath & brush,57.00
+2026-08-24,Tansy Xiong,tansy.xiong@example.com,Teeth & nails,61.00
+2026-08-24,Wendell Umali,wendell.umali@example.com,Full groom + de-shed,91.00
+2026-08-25,Odette Calloway,odette.calloway@example.com,Nail trim,105.00
+2026-08-25,Pilar Thackeray,pilar.thackeray@example.com,Teeth & nails,94.00
+2026-08-26,Nell Drummond,nell.drummond@example.com,Teeth & nails,107.00
+2026-08-26,Quentin Goodall,quentin.goodall@example.com,Bath & brush,76.00
+2026-08-26,Yusuf Birkeland,yusuf.birkeland@example.com,Nail trim,88.00
+2026-08-27,Bess Jernigan,bess.jernigan@example.com,Puppy intro groom,73.00
+2026-08-29,Bennett Kowalczyk,bennett.kowalczyk@example.com,Puppy intro groom,68.00
+2026-08-29,Kit Zeller,kit.zeller@example.com,De-shed treatment,63.00
+2026-08-29,Rosa Northcutt,rosa.northcutt@example.com,De-shed treatment,90.00
+2026-08-30,Cora Vanterpool,cora.vanterpool@example.com,Full groom + de-shed,87.00
+2026-08-30,Lela Birkeland,lela.birkeland@example.com,Puppy intro groom,116.00
+2026-08-30,Wendell Cuthbert,wendell.cuthbert@example.com,Teeth & nails,68.00
+2026-08-31,Gus Whitlock,gus.whitlock@example.com,Full groom,72.00
+2026-09-01,Desmond Delgado,desmond.delgado@example.com,Puppy intro groom,96.00
+2026-09-01,Elif Lindqvist,elif.lindqvist@example.com,Full groom + de-shed,100.00
+2026-09-01,Gideon Bostwick,gideon.bostwick@example.com,Bath & brush,73.00
+2026-09-01,Gus Umali,gus.umali@example.com,Bath & brush,118.00
+2026-09-01,Imogen Xiong,imogen.xiong@example.com,Full groom,79.00
+2026-09-01,Nia Ainsley,nia.ainsley@example.com,Bath & brush,70.00
+2026-09-03,Bess Thackeray,bess.thackeray@example.com,Nail trim,60.00
+2026-09-03,Hana Drummond,hana.drummond@example.com,Full groom,117.00
+2026-09-03,Nell Umali,nell.umali@example.com,Nail trim,99.00
+2026-09-05,Caleb Drummond,caleb.drummond@example.com,Teeth & nails,100.00
+2026-09-05,Lela Fairweather,lela.fairweather@example.com,Full groom + de-shed,102.00
+2026-09-06,Arlo Quill,arlo.quill@example.com,Teeth & nails,83.00
+2026-09-06,Hana Ainsley,hana.ainsley@example.com,Bath & brush,87.00
+2026-09-07,Hollis Jernigan,hollis.jernigan@example.com,Teeth & nails,104.00
+2026-09-07,Hollis Quill,hollis.quill@example.com,Teeth & nails,89.00
+2026-09-07,Kenji Cuthbert,kenji.cuthbert@example.com,Bath & brush,53.00
+2026-09-08,Fern Xiong,fern.xiong@example.com,Teeth & nails,61.00
+2026-09-08,Yusuf Mercado,yusuf.mercado@example.com,Bath & brush,74.00
+2026-09-09,Nell Birkeland,nell.birkeland@example.com,Bath & brush,53.00
+2026-09-09,Ximena Xiong,ximena.xiong@example.com,Teeth & nails,61.00
+2026-09-10,Hana Thackeray,hana.thackeray@example.com,Nail trim,47.00
+2026-09-11,Moss Sandoval,moss.sandoval@example.com,Full groom,92.00
+2026-09-12,Nia Vanterpool,nia.vanterpool@example.com,Full groom + de-shed,65.00
+2026-09-13,Cora Umali,cora.umali@example.com,Nail trim,70.00
+2026-09-13,Umberto Drummond,umberto.drummond@example.com,De-shed treatment,66.00
+2026-09-14,Oscar Birkeland,oscar.birkeland@example.com,Teeth & nails,69.00
+2026-09-15,Aiyana Delgado,aiyana.delgado@example.com,Full groom,96.00
+2026-09-15,Lela Lindqvist,lela.lindqvist@example.com,Nail trim,61.00
+2026-09-17,Tansy Obradovic,tansy.obradovic@example.com,Nail trim,116.00
+2026-09-18,Nell Zeller,nell.zeller@example.com,Full groom,117.00
+2026-09-18,Quentin Umali,quentin.umali@example.com,Teeth & nails,70.00
+2026-09-19,Bess Jernigan,bess.jernigan@example.com,Teeth & nails,65.00
+2026-09-19,Elif Zeller,elif.zeller@example.com,Bath & brush,81.00
+2026-09-20,Bennett Eastman,bennett.eastman@example.com,Teeth & nails,118.00
+2026-09-20,Caleb Rasmussen,caleb.rasmussen@example.com,Bath & brush,52.00
+2026-09-20,Gus Sandoval,gus.sandoval@example.com,De-shed treatment,72.00
+2026-09-20,Hana Jernigan,hana.jernigan@example.com,Full groom + de-shed,109.00
+2026-09-20,Pilar Umali,pilar.umali@example.com,Puppy intro groom,93.00
+2026-09-20,Quentin Thackeray,quentin.thackeray@example.com,Puppy intro groom,51.00
+2026-09-20,Wendell Calloway,wendell.calloway@example.com,Puppy intro groom,72.00
+2026-09-21,Mika Sorensen,Mika.Sorensen@example.com,Bath & brush,70.00
+2026-09-21,Nell Eastman,nell.eastman@example.com,Teeth & nails,77.00
+2026-09-21,Umberto Obradovic,umberto.obradovic@example.com,Puppy intro groom,102.00
+2026-09-22,Pilar Cuthbert,pilar.cuthbert@example.com,De-shed treatment,72.00
+2026-09-22,Tansy Northcutt,tansy.northcutt@example.com,Teeth & nails,69.00
+2026-09-23,Gus Mercado,gus.mercado@example.com,Full groom,84.00
+2026-09-23,Matteo Obradovic,matteo.obradovic@example.com,Full groom,93.00
+2026-09-23,Wendell Northcutt,wendell.northcutt@example.com,Nail trim,62.00
+2026-09-25,Ida Vanterpool,ida.vanterpool@example.com,Full groom,108.00
+2026-09-25,Lorena Pemberton,lorena.pemberton@example.com,Puppy intro groom,57.00
+2026-09-26,Caleb Fairweather,caleb.fairweather@example.com,De-shed treatment,68.00
+2026-09-27,Nell Thackeray,nell.thackeray@example.com,Puppy intro groom,47.00
+2026-09-28,Emory Cuthbert,emory.cuthbert@example.com,Full groom,86.00
+2026-09-28,Gideon Northcutt,gideon.northcutt@example.com,Bath & brush,70.00
+2026-09-30,Odette Calloway,odette.calloway@example.com,Nail trim,111.00
+2026-13-05,Pilar Mercado,pilar.mercado2@example.com,Full groom,88.00
+</script>
+
+<script>
+/* CUSTOMER WIN-BACK MACHINE — the engine. Shipped inside index.html verbatim.
+   No network, no storage, no eval. Built on camera for "Build It With AI";
+   the three prompts that produced it ship with it, word for word.
+
+   A customer is an email address, lowercased and trimmed. Every customer is
+   judged against their OWN visiting rhythm, never a fixed window. "Today" is
+   the newest date in the export, printed on the report as "as of". */
+
+var WB_DEFAULTS = {
+  lapse_multiplier: 2.5,     // lapsed past this multiple of their usual gap
+  slipping_multiplier: 1.5,  // slipping past this multiple (and not lapsed)
+  min_visits: 3,             // visits needed before we claim to know a rhythm
+  one_time_quiet_days: 90,   // one visit, quiet past this -> never came back
+  winback_rate_pct: 10       // the projection's assumed recovery rate
+};
+var WB_LAPSE_FLOOR_DAYS = 30;   // a rhythm-based threshold never dips below these
+var WB_SLIP_FLOOR_DAYS = 14;
+
+/* ---------- parsing ---------- */
+
+function wbParseCSV(text) {
+  var out = [], row = [], cur = "", inQ = false;
+  for (var i = 0; i < text.length; i++) {
+    var ch = text[i];
+    if (inQ) {
+      if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else inQ = false; }
+      else cur += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === ",") { row.push(cur); cur = ""; }
+    else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row.push(cur); cur = "";
+      if (row.length > 1 || row[0] !== "") out.push(row);
+      row = [];
+    } else cur += ch;
+  }
+  row.push(cur);
+  if (row.length > 1 || row[0] !== "") out.push(row);
+  return out;
+}
+
+function wbParseDate(s) {
+  if (s === null || s === undefined) return null;
+  s = String(s).trim();
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/), y, mo, d;
+  if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+  else {
+    m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) return null;
+    y = +m[3]; mo = +m[1]; d = +m[2];
+  }
+  var t = Date.UTC(y, mo - 1, d), chk = new Date(t);
+  if (chk.getUTCFullYear() !== y || chk.getUTCMonth() !== mo - 1 || chk.getUTCDate() !== d) return null;
+  return Math.round(t / 86400000);
+}
+
+function wbDayISO(n) { return new Date(n * 86400000).toISOString().slice(0, 10); }
+
+/** Money rounds half away from zero. */
+function wbMoney(n) {
+  var sign = n < 0 ? -1 : 1;
+  return sign * Math.round(Math.abs(n) * 100 + 1e-9) / 100;
+}
+
+/** Median gap: with an even number of gaps, the average of the middle two. */
+function wbMedian(xs) {
+  var a = xs.slice().sort(function (p, q) { return p - q; });
+  var n = a.length;
+  if (!n) return null;
+  return n % 2 ? a[(n - 1) / 2] : (a[n / 2 - 1] + a[n / 2]) / 2;
+}
+
+/* ---------- the engine ---------- */
+
+function wbBuildReport(csvText, settings) {
+  var S = {};
+  for (var k in WB_DEFAULTS) {
+    S[k] = settings && settings[k] !== undefined && settings[k] !== null && settings[k] !== ""
+      ? Number(settings[k]) : WB_DEFAULTS[k];
+  }
+
+  var rows = wbParseCSV(csvText);
+  var startLine = 1;
+  if (rows.length && /date/i.test(String(rows[0][0]))) { rows = rows.slice(1); startLine = 2; }
+
+  var unusable = [];
+  var byKey = {};
+  var asOf = null;
+  var rowsUsed = 0;
+
+  rows.forEach(function (r, idx) {
+    var line = idx + startLine;
+    var day = wbParseDate(r[0]);
+    if (day === null) { unusable.push({ row: line, reason: "unreadable date: \"" + String(r[0]).trim() + "\"" }); return; }
+    var emailRaw = r[2] === undefined ? "" : String(r[2]);
+    var key = emailRaw.trim().toLowerCase();
+    if (!key) { unusable.push({ row: line, reason: "no email — cannot identify the customer" }); return; }
+    var amount = parseFloat(String(r[4] === undefined ? "" : r[4]).replace(/[$,\s]/g, ""));
+    if (isNaN(amount)) { unusable.push({ row: line, reason: "unreadable amount: \"" + String(r[4]).trim() + "\"" }); return; }
+    if (amount < 0) { unusable.push({ row: line, reason: "negative amount (refund line) — handle refunds upstream" }); return; }
+
+    rowsUsed++;
+    if (asOf === null || day > asOf) asOf = day;
+    var c = byKey[key] = byKey[key] || { key: key, name: "", lastService: "", days: {}, total: 0, lastDay: -1 };
+    c.days[day] = (c.days[day] || 0) + amount;       // same-day rows merge into one visit
+    c.total += amount;
+    if (day >= c.lastDay) {
+      c.lastDay = day;
+      c.name = String(r[1] === undefined ? "" : r[1]).trim();
+      c.lastService = String(r[3] === undefined ? "" : r[3]).trim();
+    }
+  });
+
+  var customers = [];
+  Object.keys(byKey).forEach(function (key) {
+    var c = byKey[key];
+    var days = Object.keys(c.days).map(Number).sort(function (a, b) { return a - b; });
+    var gaps = [];
+    for (var i = 1; i < days.length; i++) gaps.push(days[i] - days[i - 1]);
+    var med = days.length >= S.min_visits ? wbMedian(gaps) : null;
+    var first = days[0], last = days[days.length - 1];
+    var quiet = asOf - last;
+    var tenure = (last - first) + (med !== null ? med : 0);
+    var annual = wbMoney(c.total * 365 / Math.max(tenure, 365));
+
+    var segment, threshold = null;
+    if (days.length === 1) {
+      segment = quiet > S.one_time_quiet_days ? "ONE_TIME" : "LOW_DATA";
+      threshold = S.one_time_quiet_days;
+    } else if (med === null) {
+      segment = "LOW_DATA";
+    } else {
+      var lapseAt = Math.max(S.lapse_multiplier * med, WB_LAPSE_FLOOR_DAYS);
+      var slipAt = Math.max(S.slipping_multiplier * med, WB_SLIP_FLOOR_DAYS);
+      threshold = lapseAt;
+      if (quiet > lapseAt) segment = "LAPSED";
+      else if (quiet > slipAt) segment = "SLIPPING";
+      else segment = "ACTIVE";
+    }
+
+    customers.push({
+      key: key, name: c.name, email: key,
+      visits: days.length,
+      firstDate: wbDayISO(first), lastDate: wbDayISO(last),
+      totalSpend: wbMoney(c.total),
+      medianGap: med, daysQuiet: quiet,
+      annualValue: annual, segment: segment,
+      thresholdDays: threshold === null ? null : Math.round(threshold * 100) / 100,
+      lastService: c.lastService
+    });
+  });
+
+  function rank(seg) {
+    return customers.filter(function (c) { return c.segment === seg; })
+      .sort(function (a, b) { return b.annualValue - a.annualValue || (a.email < b.email ? -1 : 1); })
+      .map(function (c) { return c.key; });
+  }
+  var segments = {
+    LAPSED: rank("LAPSED"), SLIPPING: rank("SLIPPING"),
+    ONE_TIME: rank("ONE_TIME"), LOW_DATA: rank("LOW_DATA"), ACTIVE: rank("ACTIVE")
+  };
+
+  var byKey2 = {};
+  customers.forEach(function (c) { byKey2[c.key] = c; });
+  var lapsedAnnual = 0; segments.LAPSED.forEach(function (k) { lapsedAnnual += byKey2[k].annualValue; });
+  var slipAnnual = 0; segments.SLIPPING.forEach(function (k) { slipAnnual += byKey2[k].annualValue; });
+  var oneTimeSpend = 0; segments.ONE_TIME.forEach(function (k) { oneTimeSpend += byKey2[k].totalSpend; });
+
+  return {
+    asOf: asOf === null ? null : wbDayISO(asOf),
+    customers: customers,
+    segments: segments,
+    totals: {
+      customerCount: customers.length,
+      rowsUsed: rowsUsed,
+      lapsedCount: segments.LAPSED.length,
+      lapsedAnnualValue: wbMoney(lapsedAnnual),
+      slippingCount: segments.SLIPPING.length,
+      slippingAnnualValue: wbMoney(slipAnnual),
+      oneTimeCount: segments.ONE_TIME.length,
+      oneTimeSpend: wbMoney(oneTimeSpend),
+      activeCount: segments.ACTIVE.length,
+      lowDataCount: segments.LOW_DATA.length,
+      projectedRecovery: wbMoney(wbMoney(lapsedAnnual) * S.winback_rate_pct / 100)
+    },
+    unusable: unusable,
+    settings: S
+  };
+}
+
+/* ---------- the three message framings ---------- */
+
+function wbFirstName(name) {
+  var n = String(name || "").trim();
+  return n ? n.split(/\s+/)[0] : "there";
+}
+
+function wbGapWords(c) {
+  if (c.medianGap === null) return "a while";
+  var g = c.medianGap;
+  if (g >= 300) return "about once a year";
+  if (g >= 150) return "about twice a year";
+  if (g >= 55) return "about every " + Math.round(g / 30.44 * 10) / 10 + " months";
+  if (g >= 25) return "about every " + Math.round(g / 7) + " weeks";
+  return "about every " + Math.round(g) + " days";
+}
+
+function wbMessages(c, businessName) {
+  var biz = businessName && businessName.trim() ? businessName.trim() : "us";
+  var first = wbFirstName(c.name);
+  var svc = c.lastService ? c.lastService.toLowerCase() : "visit";
+  var since = "It has been a while since your last " + svc +
+    (c.medianGap !== null ? " — you used to come in " + wbGapWords(c) + "." : ".");
+  return {
+    offer: "Subject: We saved you a spot, " + first + "\n\n" +
+      "Hi " + first + ",\n\n" + since + " We'd love to have you back — " +
+      "book anything this month and we'll take [YOUR OFFER, e.g. 15%] off. " +
+      "Reply to this email or call and we'll find you a time that works.\n\n" +
+      "— " + biz,
+    checkin: "Subject: Thinking of you, " + first + "\n\n" +
+      "Hi " + first + ",\n\n" + since + " No sales pitch — we just wanted to " +
+      "say we've missed seeing you, and if life got busy, we completely get it. " +
+      "Whenever you're ready, we're here.\n\n— " + biz,
+    feedback: "Subject: Did we get something wrong, " + first + "?\n\n" +
+      "Hi " + first + ",\n\n" + since + " If something about your last visit " +
+      "wasn't right, I'd honestly rather hear it than not. Reply to this email — " +
+      "it comes straight to me, and I read every one.\n\n— " + biz
+  };
+}
+
+if (typeof module !== "undefined") {
+  module.exports = {
+    buildReport: wbBuildReport, parseCSV: wbParseCSV, parseDate: wbParseDate,
+    money: wbMoney, median: wbMedian, messages: wbMessages, gapWords: wbGapWords,
+    DEFAULTS: WB_DEFAULTS
+  };
+}
+if (typeof window !== "undefined") {
+  window.WBM = {
+    buildReport: wbBuildReport, parseCSV: wbParseCSV, parseDate: wbParseDate,
+    money: wbMoney, median: wbMedian, messages: wbMessages, gapWords: wbGapWords,
+    DEFAULTS: WB_DEFAULTS
+  };
+}
+
+</script>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var report = null, selectedKey = null;
+
+  function money(n) {
+    var neg = n < 0;
+    var s = Math.abs(n).toFixed(2);
+    var parts = s.split(".");
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    return (neg ? "-$" : "$") + parts[0] + "." + parts[1];
+  }
+  function gapCell(c) { return c.medianGap === null ? "—" : window.WBM.gapWords(c); }
+
+  function settings() {
+    return {
+      lapse_multiplier: $("s_lapse").value,
+      slipping_multiplier: $("s_slip").value,
+      min_visits: $("s_minv").value,
+      one_time_quiet_days: $("s_onetime").value,
+      winback_rate_pct: $("s_rate").value
+    };
+  }
+
+  function kpi(cls, n, label) {
+    return '<div class="kpi ' + cls + '"><div class="n">' + n +
+           '</div><div class="l">' + label + "</div></div>";
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function fillTable(tbodySel, keys, byKey, cols) {
+    var tb = document.querySelector(tbodySel + " tbody");
+    tb.textContent = "";
+    keys.forEach(function (k) {
+      var c = byKey[k];
+      var tr = document.createElement("tr");
+      tr.setAttribute("data-key", k);
+      tr.innerHTML = cols(c);
+      tr.addEventListener("click", function () { pick(k, tr); });
+      tb.appendChild(tr);
+    });
+  }
+
+  function render() {
+    if (!report) return;
+    var t = report.totals;
+    var byKey = {};
+    report.customers.forEach(function (c) { byKey[c.key] = c; });
+
+    $("asof").textContent = "as of " + report.asOf + " (newest date in the export)";
+    $("cards").innerHTML =
+      kpi("red", t.lapsedCount, "regulars gone quiet — worth " + money(t.lapsedAnnualValue) + " a year") +
+      kpi("amb", t.slippingCount, "slipping — worth " + money(t.slippingAnnualValue) + " a year") +
+      kpi("cop", t.oneTimeCount, "never came back — spent " + money(t.oneTimeSpend) + ", once") +
+      kpi("grn", money(t.projectedRecovery), "a year, if " + report.settings.winback_rate_pct +
+          "% of the gone-quiet list comes back (estimate)") +
+      kpi("", t.customerCount, "customers in the file · " + t.rowsUsed + " rows used · " +
+          t.activeCount + " active");
+
+    var rowCols = function (c) {
+      return "<td>" + esc(c.name || c.email) + "</td><td>" + gapCell(c) + "</td><td>" +
+        c.lastDate + '</td><td class="r">' + c.daysQuiet + ' d</td><td class="r">' +
+        c.visits + '</td><td class="r">' + money(c.annualValue) + "</td>";
+    };
+    fillTable("#t_lapsed", report.segments.LAPSED, byKey, rowCols);
+    fillTable("#t_slip", report.segments.SLIPPING, byKey, rowCols);
+    fillTable("#t_onetime", report.segments.ONE_TIME, byKey, function (c) {
+      return "<td>" + esc(c.name || c.email) + "</td><td>" + c.lastDate +
+        '</td><td class="r">' + c.daysQuiet + ' d</td><td class="r">' +
+        money(c.totalSpend) + "</td>";
+    });
+    fillTable("#t_low", report.segments.LOW_DATA, byKey, function (c) {
+      return "<td>" + esc(c.name || c.email) + '</td><td class="r">' + c.visits +
+        '</td><td class="r">' + c.daysQuiet + ' d</td><td class="r">' +
+        money(c.totalSpend) + "</td>";
+    });
+
+    $("lapsedpanel").style.display = report.segments.LAPSED.length ? "" : "none";
+    $("slippanel").style.display = report.segments.SLIPPING.length ? "" : "none";
+    $("onetimepanel").style.display = report.segments.ONE_TIME.length ? "" : "none";
+    $("lowpanel").style.display = report.segments.LOW_DATA.length ? "" : "none";
+    $("lowsum").textContent = "Too new to call (" + report.segments.LOW_DATA.length + ")";
+
+    var ul = $("unusable");
+    ul.textContent = "";
+    report.unusable.forEach(function (u) {
+      var li = document.createElement("li");
+      li.textContent = "row " + u.row + " — " + u.reason;
+      ul.appendChild(li);
+    });
+    $("unupanel").style.display = report.unusable.length ? "" : "none";
+    $("unusum").textContent = "Rows this report is not built on (" + report.unusable.length + ")";
+
+    if (selectedKey && byKey[selectedKey]) showMessages(byKey[selectedKey]);
+  }
+
+  function pick(key, tr) {
+    selectedKey = key;
+    document.querySelectorAll("tbody tr.sel").forEach(function (x) { x.classList.remove("sel"); });
+    tr.classList.add("sel");
+    var byKey = {};
+    report.customers.forEach(function (c) { byKey[c.key] = c; });
+    showMessages(byKey[key]);
+    $("msgpanel").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function showMessages(c) {
+    $("msgpanel").style.display = "block";
+    $("msgwho").textContent = "for " + (c.name || c.email) + " · " + c.email +
+      " · last in " + c.lastDate + " · quiet " + c.daysQuiet + " days";
+    var m = window.WBM.messages(c, $("bizname").value);
+    var names = { offer: "A · Come back, with an offer", checkin: "B · Just a check-in, no discount",
+                  feedback: "C · Ask what went wrong" };
+    var box = $("msgs");
+    box.textContent = "";
+    Object.keys(names).forEach(function (k) {
+      var d = document.createElement("div");
+      d.className = "msg";
+      var h = document.createElement("h3"); h.textContent = names[k];
+      var pre = document.createElement("pre"); pre.textContent = m[k];
+      var b = document.createElement("button"); b.textContent = "Copy"; b.className = "ghost";
+      b.addEventListener("click", function () {
+        var ta = document.createElement("textarea");
+        ta.value = m[k]; document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(ta);
+        var ok = document.createElement("span"); ok.className = "copied"; ok.textContent = "copied";
+        b.after(ok); setTimeout(function () { ok.remove(); }, 1500);
+      });
+      d.appendChild(h); d.appendChild(pre); d.appendChild(b);
+      box.appendChild(d);
+    });
+  }
+
+  function analyze(fromSample) {
+    var text = $("csv").value;
+    if (!text.trim()) return;
+    report = window.WBM.buildReport(text, settings());
+    $("badge").style.display = fromSample ? "inline-block" : "none";
+    render();
+  }
+
+  $("analyze").addEventListener("click", function () { analyze(false); });
+  $("loadsample").addEventListener("click", function () {
+    $("csv").value = document.getElementById("sampledata").textContent.trim();
+    analyze(true);
+  });
+  ["s_lapse", "s_slip", "s_minv", "s_onetime", "s_rate"].forEach(function (id) {
+    $(id).addEventListener("change", function () {
+      if (report) { report = window.WBM.buildReport($("csv").value, settings()); render(); }
+    });
+  });
+  $("bizname").addEventListener("input", function () {
+    if (selectedKey && report) {
+      var byKey = {};
+      report.customers.forEach(function (c) { byKey[c.key] = c; });
+      if (byKey[selectedKey]) showMessages(byKey[selectedKey]);
+    }
+  });
+
+  window.WB_UI = { analyze: analyze, getReport: function () { return report; } };
+})();
+</script>
+</body>
+</html>

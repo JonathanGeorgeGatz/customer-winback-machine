@@ -1,0 +1,127 @@
+"Build It With AI" · Episode 8 · The Customer Win-Back Machine
+THE THREE PROMPTS, WORD FOR WORD, IN THE ORDER THEY WERE SENT.
+
+Prompt 2 exists because the tool was wrong. Prompt 3 exists because I was.
+Both mistakes are in the video, unedited.
+
+==============================================================================
+PROMPT 1 — THE SPEC (with my 90-day mistake already in it)
+==============================================================================
+Build me a single-file web tool that finds the customers who stopped coming
+back, so I can try to win them back before they're gone for good.
+
+GOAL
+I run a small service business. My point-of-sale can export every sale as a
+CSV, and that export is the only honest record I have of who still comes in.
+I want to paste that export into a page and be told: who has quietly stopped
+showing up, what their business was worth to me in a year, and what I should
+send them. Right now nobody notices a regular has gone missing until we
+wonder out loud about them, which is usually months too late.
+
+DATA — one pasted CSV, straight from the till
+  Date (YYYY-MM-DD) | Customer | Email | Service | Amount
+A customer is identified by their email address. Names are for display.
+
+RULES
+- A customer who hasn't been in for 90 days has lapsed. Flag them.
+- Rank lapsed customers by what their business is worth in a year, biggest
+  first, because I can't chase everyone and I shouldn't try.
+- For each one show: name, email, last visit, how long they've been quiet,
+  and what they're worth.
+- Totals at the top: how many customers I have, how many have lapsed, and
+  what the lapsed ones are worth put together.
+- Then the part that actually saves me time: pick a customer and generate
+  the win-back message — warm, short, specific to them, with their name and
+  their usual service in it, and give me three versions: one with a come-back
+  offer, one that's just a check-in with no discount, and one that asks what
+  went wrong. I will paste it into my own email. Do not send anything.
+
+EVERYTHING STAYS ON MY MACHINE
+This is my customer list. The file must work offline, make no network
+requests of any kind, and have no analytics, no fonts fetched from anywhere,
+no API keys. One HTML file I can open by double-clicking it.
+
+==============================================================================
+
+PROMPT 2 — THE FIXES THE CHECKER FORCED: IDENTITY, SWALLOWED ROWS, THE MONEY
+
+==============================================================================
+The independent checker and the tool disagree about how many customers I
+have, who has lapsed, and what every single one of them is worth. Three
+problems, and the tool owns two of them.
+
+ONE — identity. The tool treats the email as a raw string, so
+"mika.sorensen@example.com", "Mika.Sorensen@example.com" and the same
+address with a space in front of it are three different people. That is one
+woman. She has been coming in for two years, she was here nine days ago, and
+two of her three fragments are sitting on the lost-customer list. My till has been
+through two tablets and a POS migration; capitalisation is not identity.
+
+FIX: a customer is the email address lowercased with the whitespace trimmed.
+Display whatever name appeared most recently. Two rows on the same day for
+the same customer are one visit — a groom plus a nail trim is not two trips.
+
+TWO — the rows the tool swallowed. Three walk-ins have no email at all, one
+row has a date of 2026-13-05, and one is a negative refund line. The tool
+skipped all five without a word. Never do that. List every row you could not
+use, with the row number and the reason, so I can see what the report is not
+built on.
+
+THREE — the money, and this one was my fault for not defining it. The tool
+ranks by lifetime spend, so a customer who spent two thousand dollars over
+two slow years outranks one who spends twelve hundred in one year. "Worth
+to me in a year" means a YEARLY RATE:
+
+    yearly value = total spend x 365 / their tenure in days,
+    tenure = first visit to last visit, plus one of their usual gaps,
+    never less than 365 days.
+
+So a two-year customer who spent $2,040 is about a thousand a year, and a
+brand-new customer's first $85 does not get multiplied into a fantasy. Round
+money half away from zero. Say "a year of them" on screen, not "value",
+so nobody mistakes it for a lifetime number.
+
+==============================================================================
+
+PROMPT 3 — THE ONE THAT MATTERS: EVERY CUSTOMER AGAINST THEIR OWN RHYTHM
+
+==============================================================================
+The 90-day rule was my idea and it is wrong in both directions, so take it
+out and replace it with each customer's own rhythm.
+
+Evelyn Hartree is at the top of the lost list. She comes twice a year, every
+six months, four visits like clockwork — she is not lost, she is not due
+until late October. Meanwhile Marisol Quintana has been in every four weeks
+for two years and has now been silent for ten — two and a half times her own
+gap, the clearest goodbye in the whole file — and she is not on the list at
+all, because ten weeks is less than ninety days. One rule for both of them
+cannot work. Ninety days is three missed visits for one woman and no missed
+visits for the other.
+
+FIX — judge every customer against their own cadence:
+- A customer's gaps are the day-counts between their consecutive visits.
+  Their usual gap is the MEDIAN of those gaps — with an even number of gaps,
+  the average of the middle two.
+- Cadence needs evidence: a customer needs at least min_visits visits
+  (default 3) before we claim to know their rhythm.
+- LAPSED: quiet longer than lapse_multiplier x their usual gap
+  (default 2.5, and never less than 30 days).
+- SLIPPING: not lapsed, but quiet longer than slipping_multiplier x their
+  usual gap (default 1.5, never less than 14 days). These are the ones a
+  message reaches in time.
+- ONE visit only: they are not "lapsed", they never started. Put them in
+  their own NEVER-CAME-BACK list once they are quiet past
+  one_time_quiet_days (default 90); newer than that, they are TOO NEW to
+  call. A first-timer gets a different message and an honest owner knows it.
+- Two visits, or fewer than min_visits: TOO NEW / LOW DATA. Say so instead
+  of guessing.
+- Make all four knobs settings on the page, with the defaults above.
+- "Today" is the newest date in the export — print it on the report as
+  "as of", because a file exported in June must not make everyone look lapsed
+  in September.
+- The recovery projection: lapsed yearly value x a win-back rate the user
+  sets (default 10%), labelled as the estimate it is. Do not promise.
+
+Keep the ranking (yearly value, biggest first) inside each list, show their
+usual gap in plain words on every row, and keep the message generator —
+but it should now mention how long it has been in the customer's own terms.
